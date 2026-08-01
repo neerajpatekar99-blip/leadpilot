@@ -11,7 +11,20 @@ const config: Config = {
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",
+        claude: {
+          bg: "#0a0a0a",
+          card: "#171717",
+          border: "#262626",
+          text: "#ededed",
+          accent: "#D97757",
+          accentHover: "#C86445",
+          muted: "#a3a3a3"
+        }
       },
+      fontFamily: {
+        sans: ['var(--font-inter)'],
+        serif: ['var(--font-merriweather)'],
+      }
     },
   },
   plugins: [],
