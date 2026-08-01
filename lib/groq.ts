@@ -41,6 +41,8 @@ You must output a JSON object containing the following keys:
 - "timeline": Extracted timeline if mentioned, otherwise null
 - "aiSummary": A 1-2 sentence summary of exactly what the lead wants (budget, locality, type).
 - "leadScore": Must be exactly one of: "Hot", "Warm", "Cold", or "Unscored". (Hot = ready to buy/visit, Warm = responsive/exploring, Cold = unresponsive).
+- "actionItems": Array of strings of tasks for the agent (e.g. ["Call tomorrow", "Send brochure"]). Empty array if none.
+- "siteVisits": Array of ISO timestamps if the lead requested a site visit. Empty array if none.
 `;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -73,6 +75,8 @@ You must output a JSON object containing the following keys:
         timeline: parsed.timeline || null,
         aiSummary: parsed.aiSummary || null,
         leadScore: parsed.leadScore || 'Unscored',
+        actionItems: parsed.actionItems || [],
+        siteVisits: parsed.siteVisits || [],
       }
     };
   } catch (error) {
@@ -96,6 +100,8 @@ You must output a JSON object containing:
 - "budget": Extracted budget (e.g., "1.5Cr - 2Cr") or null.
 - "locality": Extracted location preference or null.
 - "propertyType": Extracted property type (e.g., "3BHK Apartment") or null.
+- "actionItems": An array of strings representing explicit tasks the agent needs to do for this lead based on the conversation (e.g. ["Call the lead tomorrow", "Send floor plans"]). Return an empty array if none.
+- "siteVisits": An array of ISO timestamp strings (or readable date strings if ISO is impossible) if the lead requested a site visit. Empty array if none.
 `;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -115,7 +121,7 @@ You must output a JSON object containing:
     return JSON.parse(responseContent);
   } catch (error) {
     console.error('Groq Analysis Error:', error);
-    return { aiSummary: '', leadScore: 'Unscored', budget: null, locality: null, propertyType: null };
+    return { aiSummary: '', leadScore: 'Unscored', budget: null, locality: null, propertyType: null, actionItems: [], siteVisits: [] };
   }
 }
 

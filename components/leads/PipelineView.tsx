@@ -2,7 +2,7 @@
 import React from 'react';
 import { Lead } from '@/lib/types';
 import { Badge } from '@/components/ui/Badge';
-import { MessageCircle, Info } from 'lucide-react';
+import { ChatBubbleOvalLeftIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 
 interface PipelineViewProps {
   leads: Lead[];
@@ -75,14 +75,14 @@ export function PipelineView({ leads, onSelectLead, onWhatsAppClick }: PipelineV
                         className="p-1.5 text-claude-muted hover:text-claude-accent hover:bg-claude-bg rounded-md transition-colors"
                         title="View Details"
                       >
-                        <Info className="w-4 h-4" />
+                        <InformationCircleIcon className="w-4 h-4" />
                       </button>
                       <button 
                         onClick={(e) => { e.stopPropagation(); onWhatsAppClick(lead); }}
                         className="p-1.5 text-green-500 hover:bg-green-950 rounded-md transition-colors"
                         title="WhatsApp"
                       >
-                        <MessageCircle className="w-4 h-4" />
+                        <ChatBubbleOvalLeftIcon className="w-4 h-4" />
                       </button>
                     </div>
                   </div>

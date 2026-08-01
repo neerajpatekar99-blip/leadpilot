@@ -1,5 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getLeads, createLead } from '@/lib/firestore/leads';
+import { z } from 'zod';
+
+const leadSchema = z.object({
+  name: z.string().min(2),
+  phone: z.string().min(10),
+  email: z.string().email().optional().or(z.literal('')),
+  source: z.string(),
+  status: z.enum(['new', 'contacted', 'replied', 'qualified', 'site_visit', 'negotiation', 'closed']).optional(),
+});
 
 export async function GET(request: Request) {
   try {
@@ -26,9 +35,15 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const data = await request.json();
-    const newLead = await createLead(data);
-    return NextResponse.json({ success: true, data: newLead }, { status: 201 });
+    const rawData = await request.json();
+    const result = leadSchema.safeParse(rawData);
+    
+    if (!result.success) {
+      return NextResponse.json({ success: false, error: 'Validation failed', details: result.error.format() }, { status: 400 });
+    }
+
+    const newLead = await createLead(result.data);
+    return NextResponse.json({ success: true, data: newLead });
   } catch (error) {
     console.error('Error creating lead:', error);
     return NextResponse.json({ success: false, error: 'Failed to create lead' }, { status: 500 });

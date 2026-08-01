@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
-import { Copy, Check } from 'lucide-react';
+import { DocumentDuplicateIcon, CheckIcon } from '@heroicons/react/24/outline';
 
 export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
@@ -35,7 +35,7 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
               onClick={copyToClipboard}
               className="bg-claude-card hover:bg-gray-50 border border-l-0 border-claude-border rounded-r-lg px-4 flex items-center justify-center transition-colors"
             >
-              {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4 text-claude-muted" />}
+              {copied ? <CheckIcon className="w-4 h-4 text-green-600" /> : <DocumentDuplicateIcon className="w-4 h-4 text-claude-muted" />}
             </button>
           </div>
         </div>

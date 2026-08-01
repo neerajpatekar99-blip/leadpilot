@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { Lead, Message } from '@/lib/types';
-import { Loader2 } from 'lucide-react';
+import { ArrowPathIcon } from '@heroicons/react/24/outline';
 
 export function ConversationView({ lead }: { lead: Lead }) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -31,7 +31,7 @@ export function ConversationView({ lead }: { lead: Lead }) {
   }, [lead.id]);
 
   if (loading) {
-    return <div className="py-10 flex justify-center text-claude-muted"><Loader2 className="w-6 h-6 animate-spin" /></div>;
+    return      <div className="flex justify-center items-center py-12 text-claude-muted"><ArrowPathIcon className="w-6 h-6 animate-spin" /></div>;
   }
 
   return (

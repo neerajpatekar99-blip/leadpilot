@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getLeadById, saveMessage, getConversation, updateLead } from '@/lib/firestore/leads';
 import { generateAIResponse } from '@/lib/groq';
 import { sendWhatsAppMessage } from '@/lib/whatsapp';
+import { createTask } from '@/lib/firestore/tasks';
+import { createVisit } from '@/lib/firestore/visits';
 
 export async function POST(request: Request) {
   try {
@@ -102,6 +104,36 @@ export async function POST(request: Request) {
 
     if (shouldUpdateLead) {
       await updateLead(leadId, updates);
+    }
+
+    // Create action items if found
+    if (extractedInfo.actionItems && Array.isArray(extractedInfo.actionItems)) {
+      for (const taskText of extractedInfo.actionItems) {
+        await createTask({
+          leadId: lead.id,
+          leadName: lead.name,
+          task: taskText,
+          status: 'Pending'
+        });
+      }
+    }
+
+    // Create site visits if found
+    if (extractedInfo.siteVisits && Array.isArray(extractedInfo.siteVisits)) {
+      for (const visitDateStr of extractedInfo.siteVisits) {
+        let timestamp = Date.now() + 86400000; // default to tomorrow
+        try {
+          const parsed = new Date(visitDateStr).getTime();
+          if (!isNaN(parsed)) timestamp = parsed;
+        } catch(e) {}
+        
+        await createVisit({
+          leadId: lead.id,
+          leadName: lead.name,
+          scheduledAt: timestamp,
+          status: 'Upcoming'
+        });
+      }
     }
 
     return NextResponse.json({ response: aiResponse, needsAgent });

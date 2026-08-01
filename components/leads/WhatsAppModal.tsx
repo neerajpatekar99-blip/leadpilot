@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from 'react';
 import { Lead } from '@/lib/types';
-import { Loader2 } from 'lucide-react';
+import { ArrowPathIcon } from '@heroicons/react/24/outline';
 
 interface WhatsAppModalProps {
   lead: Lead;
@@ -67,7 +67,7 @@ export function WhatsAppModal({ lead, onClose }: WhatsAppModalProps) {
           disabled={sending || !message.trim()}
           className="px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 transition-colors inline-flex items-center"
         >
-          {sending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+          {sending ? <ArrowPathIcon className="w-5 h-5 animate-spin mr-2" /> : null}
           {sending ? 'Sending...' : 'Send WhatsApp'}
         </button>
       </div>

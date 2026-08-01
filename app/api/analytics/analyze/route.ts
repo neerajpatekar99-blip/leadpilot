@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getLeadById, getConversation, updateLead } from '@/lib/firestore/leads';
 import { generateLeadIntelligence } from '@/lib/groq';
+import { createTask } from '@/lib/firestore/tasks';
+import { createVisit } from '@/lib/firestore/visits';
 
 export async function POST(req: Request) {
   try {
@@ -28,6 +30,36 @@ export async function POST(req: Request) {
       locality: intelligence.locality || undefined,
       propertyType: intelligence.propertyType || undefined,
     });
+
+    // Create action items if found
+    if (intelligence.actionItems && Array.isArray(intelligence.actionItems)) {
+      for (const taskText of intelligence.actionItems) {
+        await createTask({
+          leadId: lead.id,
+          leadName: lead.name,
+          task: taskText,
+          status: 'Pending'
+        });
+      }
+    }
+
+    // Create site visits if found
+    if (intelligence.siteVisits && Array.isArray(intelligence.siteVisits)) {
+      for (const visitDateStr of intelligence.siteVisits) {
+        let timestamp = Date.now() + 86400000; // default to tomorrow
+        try {
+          const parsed = new Date(visitDateStr).getTime();
+          if (!isNaN(parsed)) timestamp = parsed;
+        } catch(e) {}
+        
+        await createVisit({
+          leadId: lead.id,
+          leadName: lead.name,
+          scheduledAt: timestamp,
+          status: 'Upcoming'
+        });
+      }
+    }
 
     return NextResponse.json({ success: true, intelligence });
   } catch (error: unknown) {

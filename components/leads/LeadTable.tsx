@@ -3,16 +3,36 @@
 import React from 'react';
 import { Lead } from '@/lib/types';
 import { Badge } from '@/components/ui/Badge';
-import { MessageSquare, MessageCircle, Phone, Mail, User } from 'lucide-react';
+import { ChatBubbleLeftIcon, ChatBubbleOvalLeftIcon, PhoneIcon, EnvelopeIcon, UserIcon } from '@heroicons/react/24/outline';
 
 interface LeadTableProps {
   leads: Lead[];
   loading: boolean;
   onViewChat: (lead: Lead) => void;
   onSendWhatsApp: (lead: Lead) => void;
+  selectedLeads?: string[];
+  onSelectionChange?: (selectedIds: string[]) => void;
 }
 
-export function LeadTable({ leads, loading, onViewChat, onSendWhatsApp }: LeadTableProps) {
+export function LeadTable({ leads, loading, onViewChat, onSendWhatsApp, selectedLeads = [], onSelectionChange }: LeadTableProps) {
+  
+  const toggleSelection = (leadId: string) => {
+    if (!onSelectionChange) return;
+    if (selectedLeads.includes(leadId)) {
+      onSelectionChange(selectedLeads.filter(id => id !== leadId));
+    } else {
+      onSelectionChange([...selectedLeads, leadId]);
+    }
+  };
+
+  const toggleAll = () => {
+    if (!onSelectionChange) return;
+    if (selectedLeads.length === leads.length && leads.length > 0) {
+      onSelectionChange([]);
+    } else {
+      onSelectionChange(leads.map(l => l.id));
+    }
+  };
   
   const getStatusColor = (status: Lead['status']) => {
     switch (status) {
@@ -64,14 +84,14 @@ export function LeadTable({ leads, loading, onViewChat, onSendWhatsApp }: LeadTa
             <div className="flex justify-between items-start mb-3">
               <div>
                 <h3 className="font-semibold text-claude-text flex items-center gap-2">
-                  <User className="w-4 h-4 text-claude-muted" /> {lead.name}
+                  <UserIcon className="w-4 h-4 text-claude-muted" /> {lead.name}
                 </h3>
                 <p className="text-sm text-claude-muted flex items-center gap-2 mt-1">
-                  <Phone className="w-4 h-4" /> {lead.phone}
+                  <PhoneIcon className="w-4 h-4" /> {lead.phone}
                 </p>
                 {lead.email && (
                   <p className="text-sm text-claude-muted flex items-center gap-2 mt-1">
-                    <Mail className="w-4 h-4" /> {lead.email}
+                    <EnvelopeIcon className="w-4 h-4" /> {lead.email}
                   </p>
                 )}
               </div>
@@ -81,7 +101,7 @@ export function LeadTable({ leads, loading, onViewChat, onSendWhatsApp }: LeadTa
                   className="p-2 text-claude-muted hover:text-claude-text bg-claude-bg rounded-full transition-colors"
                   title="View Chat"
                 >
-                  <MessageSquare className="w-4 h-4" />
+                  <ChatBubbleLeftIcon className="w-4 h-4" />
                 </button>
                 <button 
                   onClick={() => onSendWhatsApp(lead)}
@@ -89,7 +109,7 @@ export function LeadTable({ leads, loading, onViewChat, onSendWhatsApp }: LeadTa
                   className={`p-2 rounded-full transition-colors ${lead.consentStatus !== 'opted_in' ? 'text-gray-300 bg-gray-50 cursor-not-allowed' : 'text-green-600 bg-green-50 hover:bg-green-100'}`}
                   title="Send WhatsApp"
                 >
-                  <MessageCircle className="w-4 h-4" />
+                  <ChatBubbleOvalLeftIcon className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -113,6 +133,14 @@ export function LeadTable({ leads, loading, onViewChat, onSendWhatsApp }: LeadTa
         <table className="min-w-full divide-y divide-claude-border">
           <thead className="bg-claude-bg">
             <tr>
+              <th className="px-6 py-4 text-left">
+                <input 
+                  type="checkbox" 
+                  className="rounded border-gray-600 bg-gray-800 text-claude-accent focus:ring-claude-accent"
+                  checked={selectedLeads.length === leads.length && leads.length > 0}
+                  onChange={toggleAll}
+                />
+              </th>
               <th className="px-6 py-4 text-left text-xs font-semibold text-claude-muted uppercase tracking-wider">Name / Contact</th>
               <th className="px-6 py-4 text-left text-xs font-semibold text-claude-muted uppercase tracking-wider">Intelligence</th>
               <th className="px-6 py-4 text-left text-xs font-semibold text-claude-muted uppercase tracking-wider">Status</th>
@@ -124,6 +152,14 @@ export function LeadTable({ leads, loading, onViewChat, onSendWhatsApp }: LeadTa
           <tbody className="bg-claude-card divide-y divide-claude-border">
             {leads.map(lead => (
               <tr key={lead.id} className={`hover:bg-gray-50 transition-colors ${lead.aiStatus === 'needs_agent' ? 'bg-red-50/30' : ''}`}>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <input 
+                    type="checkbox" 
+                    className="rounded border-gray-600 bg-gray-800 text-claude-accent focus:ring-claude-accent"
+                    checked={selectedLeads.includes(lead.id)}
+                    onChange={() => toggleSelection(lead.id)}
+                  />
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="font-medium text-claude-text">{lead.name}</div>
                   <div className="text-sm text-claude-muted mt-1">{lead.phone}</div>
@@ -168,7 +204,7 @@ export function LeadTable({ leads, loading, onViewChat, onSendWhatsApp }: LeadTa
                       className="text-claude-muted hover:text-claude-accent transition-colors inline-flex items-center"
                       title="View Chat"
                     >
-                      <MessageSquare className="w-5 h-5" />
+                      <ChatBubbleLeftIcon className="w-5 h-5" />
                     </button>
                     <button 
                       onClick={() => onSendWhatsApp(lead)}
@@ -176,7 +212,7 @@ export function LeadTable({ leads, loading, onViewChat, onSendWhatsApp }: LeadTa
                       className={`inline-flex items-center transition-colors ${lead.consentStatus !== 'opted_in' ? 'text-gray-300 cursor-not-allowed' : 'text-green-600 hover:text-green-800'}`}
                       title="Send WhatsApp"
                     >
-                      <MessageCircle className="w-5 h-5" />
+                      <ChatBubbleOvalLeftIcon className="w-5 h-5" />
                     </button>
                   </div>
                 </td>

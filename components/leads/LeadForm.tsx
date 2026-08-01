@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Lead } from '@/lib/types';
-import { Loader2 } from 'lucide-react';
+import { ArrowPathIcon } from '@heroicons/react/24/outline';
 
 export function LeadForm({ onSuccess }: { onSuccess: () => void }) {
   const [formData, setFormData] = useState({
@@ -133,7 +133,7 @@ export function LeadForm({ onSuccess }: { onSuccess: () => void }) {
           disabled={loading}
           className="inline-flex items-center justify-center rounded-md border border-transparent bg-claude-accent px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[#C86445] focus:outline-none focus:ring-2 focus:ring-claude-accent focus:ring-offset-2 disabled:opacity-50 transition-colors"
         >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+          {loading ? <ArrowPathIcon className="w-5 h-5 animate-spin mr-2" /> : null}
           {loading ? 'Saving...' : 'Save Lead'}
         </button>
       </div>

@@ -19,6 +19,39 @@ export interface Lead {
   deletedAt?: number;
 }
 
+export interface Listing {
+  id: string;
+  title: string;
+  price: string;
+  type: string;
+  locality: string;
+  mediaUrls?: string[];
+  status: 'Active' | 'Sold' | 'Draft';
+  createdAt: number;
+}
+
+export interface SiteVisit {
+  id: string;
+  leadId: string;
+  leadName: string;
+  propertyId?: string;
+  propertyTitle?: string;
+  scheduledAt: number;
+  status: 'Upcoming' | 'Completed' | 'Cancelled';
+  notes?: string;
+  createdAt: number;
+}
+
+export interface ActionItem {
+  id: string;
+  leadId: string;
+  leadName: string;
+  task: string;
+  dueDate?: number;
+  status: 'Pending' | 'Completed';
+  createdAt: number;
+}
+
 export interface Message {
   id: string;
   leadId: string;
