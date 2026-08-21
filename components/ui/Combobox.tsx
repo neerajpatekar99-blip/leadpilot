@@ -3,10 +3,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
 
+export interface ComboboxOption {
+  value: string;
+  label: string;
+}
+
 interface ComboboxProps {
   value: string;
   onChange: (val: string) => void;
-  options: string[];
+  options: (string | ComboboxOption)[];
   placeholder?: string;
 }
 
@@ -15,9 +20,14 @@ export function Combobox({ value, onChange, options, placeholder = "Select or ty
   const [inputValue, setInputValue] = useState(value);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const normalizedOptions: ComboboxOption[] = options.map(opt => 
+    typeof opt === 'string' ? { value: opt, label: opt } : opt
+  );
+
   useEffect(() => {
-    setInputValue(value);
-  }, [value]);
+    const matched = normalizedOptions.find(o => o.value === value);
+    setInputValue(matched ? matched.label : value);
+  }, [value, options]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -29,55 +39,63 @@ export function Combobox({ value, onChange, options, placeholder = "Select or ty
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const filteredOptions = (inputValue === value && isOpen) 
-    ? options 
-    : options.filter(opt => opt.toLowerCase().includes(inputValue.toLowerCase()));
+  const filteredOptions = normalizedOptions.filter(opt =>
+    opt.label.toLowerCase().includes((inputValue || '').toLowerCase()) ||
+    opt.value.toLowerCase().includes((inputValue || '').toLowerCase())
+  );
+
+  const handleSelect = (opt: ComboboxOption) => {
+    setInputValue(opt.label);
+    onChange(opt.value);
+    setIsOpen(false);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setInputValue(val);
+    onChange(val);
+    if (!isOpen) setIsOpen(true);
+  };
 
   return (
-    <div className="relative w-full" ref={containerRef}>
-      <div className="relative flex items-center w-full bg-claude-card border border-claude-border rounded-md px-3 focus-within:border-claude-accent transition-colors shadow-sm">
+    <div className="relative" ref={containerRef}>
+      <div className="relative">
         <input
           type="text"
           value={inputValue}
-          onChange={(e) => {
-            setInputValue(e.target.value);
-            onChange(e.target.value);
-            setIsOpen(true);
-          }}
+          onChange={handleInputChange}
           onFocus={() => setIsOpen(true)}
           placeholder={placeholder}
-          className="w-full bg-transparent py-2 text-sm text-claude-text focus:outline-none placeholder-claude-muted"
+          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none pr-8"
         />
-        <button type="button" onClick={() => setIsOpen(!isOpen)} className="p-1 text-claude-muted hover:text-white transition-colors">
-          <ChevronDownIcon className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={() => setIsOpen(!isOpen)}
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+        >
+          <ChevronDownIcon className="w-4 h-4" />
         </button>
       </div>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-[#1e1e1e] border border-claude-border rounded-md shadow-2xl overflow-hidden max-h-60 overflow-y-auto">
+        <ul className="absolute z-50 w-full mt-1 bg-slate-900 border border-slate-800 rounded-lg shadow-xl max-h-48 overflow-y-auto py-1">
           {filteredOptions.length > 0 ? (
             filteredOptions.map((opt) => (
-              <button
-                key={opt}
-                type="button"
-                onClick={() => { 
-                  onChange(opt); 
-                  setInputValue(opt); 
-                  setIsOpen(false); 
-                }}
-                className={`w-full text-left px-4 py-2.5 text-sm hover:bg-claude-accent hover:text-white transition-colors ${
-                  value === opt ? 'text-claude-accent font-medium' : 'text-gray-300'
+              <li
+                key={opt.value}
+                onClick={() => handleSelect(opt)}
+                className={`px-3 py-1.5 text-xs text-slate-300 hover:bg-emerald-500/20 hover:text-emerald-300 cursor-pointer ${
+                  opt.value === value ? 'bg-slate-800 text-emerald-400 font-semibold' : ''
                 }`}
               >
-                {opt}
-              </button>
+                {opt.label}
+              </li>
             ))
           ) : (
-            <div className="px-4 py-3 text-sm text-claude-muted">
-              Use custom property type: <span className="text-claude-accent font-medium">{inputValue}</span>
-            </div>
+            <li className="px-3 py-2 text-xs text-slate-500 italic">No options found.</li>
           )}
-        </div>
+        </ul>
       )}
     </div>
   );

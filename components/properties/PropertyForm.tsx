@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Combobox } from '@/components/ui/Combobox';
 import { 
   PlusIcon, 
@@ -9,7 +9,11 @@ import {
   DocumentTextIcon, 
   PhotoIcon, 
   CheckCircleIcon,
-  ArrowPathIcon 
+  ArrowPathIcon,
+  ArrowUpTrayIcon,
+  DocumentArrowUpIcon,
+  VideoCameraIcon,
+  FilmIcon
 } from '@heroicons/react/24/outline';
 
 const PROPERTY_TYPES = ['1BHK', '2BHK', '3BHK', '4BHK', 'villa', 'plot', 'office', 'shop'];
@@ -66,11 +70,16 @@ function formatIndianCurrency(amount: number): string {
 }
 
 export default function PropertyForm({ onSuccess, onCancel }: { onSuccess?: () => void, onCancel?: () => void }) {
-  const [mode, setMode] = useState<'form' | 'ai_import'>('ai_import');
+  const [mode, setMode] = useState<'upload_doc' | 'ai_import' | 'form'>('upload_doc');
   const [rawText, setRawText] = useState('');
   const [parsing, setParsing] = useState(false);
   const [parsedSuccess, setParsedSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const mediaInputRef = useRef<HTMLInputElement | null>(null);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -79,19 +88,87 @@ export default function PropertyForm({ onSuccess, onCancel }: { onSuccess?: () =
     priceMin: 0,
     priceMax: 0,
     areaSqft: 0,
-    amenitiesStr: '',
-    description: '',
+    amenities: [] as string[],
+    imageUrls: [] as string[],
+    videoUrl: '',
     status: 'available',
+    description: '',
     builderName: '',
-    possessionDate: 'Ready to Move',
-    furnishing: 'semi_furnished'
+    possessionDate: '',
+    furnishing: 'unfurnished',
   });
 
-  const [imageUrls, setImageUrls] = useState<string[]>([
-    'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80'
-  ]);
+  const [amenityInput, setAmenityInput] = useState('');
+  const [imageUrlInput, setImageUrlInput] = useState('');
 
-  const handleAIParse = async () => {
+  // Handle PDF / Document Upload
+  const handleFileUpload = async (file: File) => {
+    if (!file) return;
+    setUploadedFileName(file.name);
+    setParsing(true);
+    setParsedSuccess(false);
+
+    try {
+      const data = new FormData();
+      data.append('file', file);
+
+      const res = await fetch('/api/properties/parse-file', {
+        method: 'POST',
+        body: data,
+      });
+
+      const result = await res.json();
+      if (result.success && result.data) {
+        const d = result.data;
+        setFormData(prev => ({
+          ...prev,
+          title: d.title || prev.title || file.name.replace(/\.[^/.]+$/, ''),
+          propertyType: d.propertyType || prev.propertyType,
+          locality: d.locality || prev.locality,
+          priceMin: d.priceMin || prev.priceMin,
+          priceMax: d.priceMax || prev.priceMax,
+          areaSqft: d.areaSqft || prev.areaSqft,
+          amenities: d.amenities?.length ? Array.from(new Set([...prev.amenities, ...d.amenities])) : prev.amenities,
+          description: d.description || prev.description,
+          builderName: d.builderName || prev.builderName,
+          possessionDate: d.possessionDate || prev.possessionDate,
+          furnishing: d.furnishing || prev.furnishing,
+        }));
+        setParsedSuccess(true);
+        setMode('form');
+      } else {
+        alert(result.error || 'Could not parse document.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Failed to parse document with AI.');
+    } finally {
+      setParsing(false);
+    }
+  };
+
+  // Handle Multiple Image Uploads (converts to preview data URLs)
+  const handleMediaUpload = (files: FileList | null) => {
+    if (!files || !files.length) return;
+
+    Array.from(files).forEach(file => {
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          if (e.target?.result) {
+            setFormData(prev => ({
+              ...prev,
+              imageUrls: [...prev.imageUrls, e.target!.result as string]
+            }));
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  };
+
+  // Handle Raw Text AI Parse
+  const handleAiParse = async () => {
     if (!rawText.trim()) return;
     setParsing(true);
     setParsedSuccess(false);
@@ -100,133 +177,277 @@ export default function PropertyForm({ onSuccess, onCancel }: { onSuccess?: () =
       const res = await fetch('/api/properties/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: rawText })
+        body: JSON.stringify({ text: rawText }),
       });
-      const json = await res.json();
-      if (json.success && json.data) {
-        const p = json.data;
+
+      const result = await res.json();
+      if (result.success && result.data) {
+        const d = result.data;
         setFormData(prev => ({
           ...prev,
-          title: p.title || prev.title,
-          propertyType: p.propertyType || prev.propertyType,
-          locality: p.locality || prev.locality,
-          priceMin: p.priceMin || prev.priceMin,
-          priceMax: p.priceMax || prev.priceMax,
-          areaSqft: p.areaSqft || prev.areaSqft,
-          amenitiesStr: Array.isArray(p.amenities) ? p.amenities.join(', ') : (p.amenitiesStr || prev.amenitiesStr),
-          description: p.description || prev.description,
-          builderName: p.builderName || prev.builderName,
-          possessionDate: p.possessionDate || prev.possessionDate,
-          furnishing: p.furnishing || prev.furnishing,
+          title: d.title || prev.title,
+          propertyType: d.propertyType || prev.propertyType,
+          locality: d.locality || prev.locality,
+          priceMin: d.priceMin || prev.priceMin,
+          priceMax: d.priceMax || prev.priceMax,
+          areaSqft: d.areaSqft || prev.areaSqft,
+          amenities: d.amenities?.length ? d.amenities : prev.amenities,
+          description: d.description || prev.description,
+          builderName: d.builderName || prev.builderName,
+          possessionDate: d.possessionDate || prev.possessionDate,
+          furnishing: d.furnishing || prev.furnishing,
         }));
         setParsedSuccess(true);
-        setTimeout(() => {
-          setMode('form');
-        }, 600);
+        setMode('form');
       } else {
-        alert(json.error || 'Failed to parse property text');
+        alert(result.error || 'Failed to parse text.');
       }
-    } catch (e) {
-      console.error(e);
-      alert('Error parsing text with AI');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to parse property with AI.');
     } finally {
       setParsing(false);
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
+  const handleAddAmenity = () => {
+    if (amenityInput.trim()) {
+      setFormData(prev => ({
+        ...prev,
+        amenities: [...prev.amenities, amenityInput.trim()]
+      }));
+      setAmenityInput('');
+    }
+  };
+
+  const handleRemoveAmenity = (index: number) => {
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'priceMin' || name === 'priceMax' || name === 'areaSqft' ? Number(value) : value
+      amenities: prev.amenities.filter((_, i) => i !== index)
     }));
   };
 
-  const handleImageUrlChange = (index: number, value: string) => {
-    const newUrls = [...imageUrls];
-    newUrls[index] = value;
-    setImageUrls(newUrls);
+  const handleAddImageUrl = () => {
+    if (imageUrlInput.trim()) {
+      setFormData(prev => ({
+        ...prev,
+        imageUrls: [...prev.imageUrls, imageUrlInput.trim()]
+      }));
+      setImageUrlInput('');
+    }
   };
 
-  const addImageUrl = () => setImageUrls([...imageUrls, '']);
-  const removeImageUrl = (index: number) => setImageUrls(imageUrls.filter((_, i) => i !== index));
+  const handleRemoveImageUrl = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      imageUrls: prev.imageUrls.filter((_, i) => i !== index)
+    }));
+  };
 
-  const applyImagePreset = (urls: string[]) => {
-    setImageUrls(urls);
+  const handleApplyImagePreset = (presetUrls: string[]) => {
+    setFormData(prev => ({
+      ...prev,
+      imageUrls: Array.from(new Set([...prev.imageUrls, ...presetUrls]))
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
     try {
-      const amenities = formData.amenitiesStr.split(',').map(s => s.trim()).filter(Boolean);
-      const validImages = imageUrls.filter(Boolean);
-      
-      const payload = {
-        ...formData,
-        amenities,
-        imageUrls: validImages
-      };
-      
       const res = await fetch('/api/properties', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(formData),
       });
-      
+
       if (res.ok) {
         if (onSuccess) onSuccess();
       } else {
-        alert('Failed to save property');
+        const data = await res.json();
+        alert(data.error || 'Failed to create property');
       }
     } catch (error) {
-      console.error(error);
-      alert('Error saving property');
+      console.error('Error creating property:', error);
+      alert('Failed to create property');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Mode Switcher Tabs */}
-      <div className="flex border-b border-claude-border pb-3 gap-2">
-        <button
-          type="button"
-          onClick={() => setMode('ai_import')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-            mode === 'ai_import' 
-              ? 'bg-claude-accent text-white shadow-md shadow-claude-accent/20' 
-              : 'text-claude-muted hover:text-white hover:bg-white/5'
-          }`}
-        >
-          <SparklesIcon className="w-4 h-4" />
-          <span>✨ AI Fast Import (Paste Text)</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode('form')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-            mode === 'form' 
-              ? 'bg-claude-accent text-white shadow-md shadow-claude-accent/20' 
-              : 'text-claude-muted hover:text-white hover:bg-white/5'
-          }`}
-        >
-          <DocumentTextIcon className="w-4 h-4" />
-          <span>📝 Property Details Form</span>
-        </button>
+    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-2xl relative overflow-hidden">
+      {/* Mode Switcher Banner */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-5 border-b border-slate-800 mb-6 gap-3">
+        <div>
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <SparklesIcon className="w-6 h-6 text-emerald-400" />
+            Add Property to Inventory
+          </h2>
+          <p className="text-xs text-slate-400 mt-1">
+            Drop a PDF brochure, upload photos, or paste raw broker text to auto-fill in seconds.
+          </p>
+        </div>
+
+        {/* Ingestion Mode Tabs */}
+        <div className="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-800 self-stretch sm:self-auto">
+          <button
+            type="button"
+            onClick={() => setMode('upload_doc')}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+              mode === 'upload_doc'
+                ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <DocumentArrowUpIcon className="w-4 h-4" />
+            Upload PDF / Media
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('ai_import')}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+              mode === 'ai_import'
+                ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <DocumentTextIcon className="w-4 h-4" />
+            Paste WhatsApp Text
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('form')}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+              mode === 'form'
+                ? 'bg-slate-800 text-emerald-400 border border-slate-700'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            {parsedSuccess ? <CheckCircleIcon className="w-4 h-4 text-emerald-400" /> : null}
+            Property Form {parsedSuccess && '(Filled)'}
+          </button>
+        </div>
       </div>
 
-      {/* AI Fast Import Screen */}
-      {mode === 'ai_import' && (
-        <div className="space-y-4 animate-in fade-in duration-300">
-          <div className="bg-gradient-to-r from-claude-accent/10 to-transparent p-4 rounded-xl border border-claude-accent/20">
-            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-              <SparklesIcon className="w-4 h-4 text-claude-accent" />
-              Effortless Client Ingestion
+      {/* 1. DOCUMENT & MEDIA DROPZONE TAB */}
+      {mode === 'upload_doc' && (
+        <div className="space-y-6">
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOver(false);
+              if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                const file = e.dataTransfer.files[0];
+                if (file.name.toLowerCase().endsWith('.pdf') || file.type.startsWith('text/')) {
+                  handleFileUpload(file);
+                } else if (file.type.startsWith('image/')) {
+                  handleMediaUpload(e.dataTransfer.files);
+                  setMode('form');
+                }
+              }
+            }}
+            className={`border-2 border-dashed rounded-xl p-8 text-center transition-all ${
+              dragOver
+                ? 'border-emerald-400 bg-emerald-500/10 scale-[1.01]'
+                : 'border-slate-700 hover:border-emerald-500/50 bg-slate-950/60'
+            }`}
+          >
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept=".pdf,.txt,.doc,.docx"
+              onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
+              className="hidden"
+            />
+            <input
+              type="file"
+              ref={mediaInputRef}
+              accept="image/*,video/*"
+              multiple
+              onChange={(e) => {
+                handleMediaUpload(e.target.files);
+                setMode('form');
+              }}
+              className="hidden"
+            />
+
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shadow-inner">
+              {parsing ? (
+                <ArrowPathIcon className="w-8 h-8 animate-spin" />
+              ) : (
+                <DocumentArrowUpIcon className="w-8 h-8" />
+              )}
+            </div>
+
+            <h3 className="text-base font-semibold text-white">
+              {parsing ? 'AI is extracting details from brochure...' : 'Drag & Drop PDF Brochure or Photos'}
             </h3>
-            <p className="text-xs text-claude-muted mt-1 leading-relaxed">
-              Paste any raw WhatsApp message, builder broadcast, or broker notes below. Our AI will automatically extract the Title, Locality, Price, BHK Type, Amenities, and Description in seconds!
+            <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+              Drop any builder PDF brochure, flyer, or property photo album. Our AI extracts pricing, BHK, floor plans, and amenities instantly.
+            </p>
+
+            {uploadedFileName && (
+              <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-slate-800 text-emerald-300 rounded-full text-xs font-mono border border-slate-700">
+                📄 {uploadedFileName}
+              </div>
+            )}
+
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                disabled={parsing}
+                onClick={() => fileInputRef.current?.click()}
+                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold rounded-lg text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50"
+              >
+                <DocumentTextIcon className="w-4 h-4" />
+                Select PDF Brochure
+              </button>
+              <button
+                type="button"
+                disabled={parsing}
+                onClick={() => mediaInputRef.current?.click()}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-lg text-xs flex items-center gap-2 border border-slate-700 transition-all disabled:opacity-50"
+              >
+                <PhotoIcon className="w-4 h-4 text-emerald-400" />
+                Upload Property Photos
+              </button>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            {onCancel && (
+              <button
+                type="button"
+                onClick={onCancel}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition-all"
+              >
+                Cancel
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setMode('ai_import')}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium border border-slate-700 transition-all"
+            >
+              Or Paste WhatsApp Message →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 2. TEXT FAST IMPORT TAB */}
+      {mode === 'ai_import' && (
+        <div className="space-y-4">
+          <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+            <h3 className="text-sm font-semibold text-emerald-400 flex items-center gap-1.5">
+              <SparklesIcon className="w-4 h-4" /> Paste any Raw Property Text
+            </h3>
+            <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+              Paste messy WhatsApp messages from builders, broker broadcast groups, or listing notes.
             </p>
           </div>
 
@@ -235,270 +456,362 @@ export default function PropertyForm({ onSuccess, onCancel }: { onSuccess?: () =
               rows={6}
               value={rawText}
               onChange={(e) => setRawText(e.target.value)}
-              placeholder="e.g. Prestige Lakeside Habitat 3BHK in Whitefield Bangalore. 1850 sqft. Asking 1.55 Cr to 1.75 Cr. Amenities: Clubhouse, Olympic pool, tennis court. Ready to move. Semi-furnished."
-              className="w-full bg-claude-bg border border-claude-border rounded-xl p-3.5 text-sm text-claude-text focus:outline-none focus:ring-1 focus:ring-claude-accent leading-relaxed"
+              placeholder="e.g. *New Launch at Kharghar!* 2BHK 1100 sqft with balcony. Price: 65L to 72L negotiable. Swimming pool, Gym, Clubhouse, 24/7 Security. Possession Dec 2026. Contact Sachin."
+              className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-mono leading-relaxed"
             />
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center justify-between pt-2">
             <button
               type="button"
-              onClick={() => {
-                setRawText("Godrej Splendour 2BHK in Whitefield, Bangalore. 980 sqft. Price ₹75 Lakh - ₹85 Lakh. Amenities: Swimming Pool, Gym, Indoor Games, 24/7 Security. Possession: Dec 2026. Unfurnished.");
-              }}
-              className="text-xs text-claude-muted hover:text-claude-accent underline"
+              onClick={() => setMode('form')}
+              className="text-xs text-slate-400 hover:text-white transition-colors"
             >
-              Try sample listing text
+              Skip to Manual Entry →
             </button>
 
-            <button
-              type="button"
-              disabled={parsing || !rawText.trim()}
-              onClick={handleAIParse}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 bg-claude-accent hover:bg-opacity-90 disabled:opacity-50 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-all shadow-lg shadow-claude-accent/20"
-            >
-              {parsing ? (
-                <>
-                  <ArrowPathIcon className="w-4 h-4 animate-spin" />
-                  <span>Analyzing & Extracting...</span>
-                </>
-              ) : parsedSuccess ? (
-                <>
-                  <CheckCircleIcon className="w-4 h-4 text-green-300" />
-                  <span>Imported Successfully!</span>
-                </>
-              ) : (
-                <>
-                  <SparklesIcon className="w-4 h-4" />
-                  <span>Auto-Fill Form with AI</span>
-                </>
+            <div className="flex items-center gap-3">
+              {onCancel && (
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition-all"
+                >
+                  Cancel
+                </button>
               )}
-            </button>
+              <button
+                type="button"
+                disabled={parsing || !rawText.trim()}
+                onClick={handleAiParse}
+                className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-lg text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50"
+              >
+                {parsing ? (
+                  <>
+                    <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                    Extracting with AI...
+                  </>
+                ) : (
+                  <>
+                    <SparklesIcon className="w-4 h-4" />
+                    Auto-Fill Property Form
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Manual & Verified Form */}
+      {/* 3. STRUCTURED PROPERTY FORM */}
       {mode === 'form' && (
-        <form onSubmit={handleSubmit} className="space-y-6 animate-in fade-in duration-300">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {parsedSuccess && (
+            <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg flex items-center justify-between text-xs text-emerald-300">
+              <span className="flex items-center gap-2">
+                <CheckCircleIcon className="w-5 h-5 text-emerald-400" />
+                <strong>Auto-filled by AI!</strong> Please review and save.
+              </span>
+              <button
+                type="button"
+                onClick={() => setMode('upload_doc')}
+                className="text-emerald-400 underline hover:text-emerald-300"
+              >
+                Upload another file
+              </button>
+            </div>
+          )}
+
+          {/* Core Info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted mb-1.5">Title</label>
-              <input 
-                required 
-                name="title" 
-                value={formData.title} 
-                onChange={handleChange} 
-                className="w-full bg-claude-bg border border-claude-border rounded-lg px-3 py-2 text-sm text-claude-text focus:outline-none focus:ring-1 focus:ring-claude-accent" 
-                placeholder="e.g. Prestige Lakeside 3BHK" 
+              <label className="block text-xs font-medium text-slate-300 mb-1">
+                Property Title <span className="text-emerald-400">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={formData.title}
+                onChange={e => setFormData({ ...formData, title: e.target.value })}
+                placeholder="e.g. Prestige Lakeside Habitat 3BHK"
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted mb-1.5">Property Type</label>
-              <Combobox 
-                options={PROPERTY_TYPES}
+              <label className="block text-xs font-medium text-slate-300 mb-1">
+                Locality / Area <span className="text-emerald-400">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={formData.locality}
+                onChange={e => setFormData({ ...formData, locality: e.target.value })}
+                placeholder="e.g. Kharghar, Navi Mumbai"
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-300 mb-1">Property Type</label>
+              <Combobox
+                options={PROPERTY_TYPES.map(t => ({ value: t, label: t }))}
                 value={formData.propertyType}
-                onChange={(val) => setFormData(prev => ({ ...prev, propertyType: val }))}
-                placeholder="Select type"
+                onChange={val => setFormData({ ...formData, propertyType: val })}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted mb-1.5">Locality</label>
-              <input 
-                required 
-                name="locality" 
-                value={formData.locality} 
-                onChange={handleChange} 
-                className="w-full bg-claude-bg border border-claude-border rounded-lg px-3 py-2 text-sm text-claude-text focus:outline-none focus:ring-1 focus:ring-claude-accent" 
-                placeholder="e.g. Whitefield, Bangalore" 
+              <label className="block text-xs font-medium text-slate-300 mb-1">Status</label>
+              <Combobox
+                options={STATUSES.map(s => ({ value: s, label: s.toUpperCase() }))}
+                value={formData.status}
+                onChange={val => setFormData({ ...formData, status: val })}
               />
             </div>
 
+            {/* Price Inputs with Indian Currency Helper */}
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted mb-1.5">Status</label>
-              <select 
-                required 
-                name="status" 
-                value={formData.status} 
-                onChange={handleChange} 
-                className="w-full bg-claude-bg border border-claude-border rounded-lg px-3 py-2 text-sm text-claude-text focus:outline-none focus:ring-1 focus:ring-claude-accent"
-              >
-                {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted mb-1.5">
-                Min Price (₹) {formData.priceMin > 0 && <span className="text-claude-accent font-medium ml-1">({formatIndianCurrency(formData.priceMin)})</span>}
+              <label className="block text-xs font-medium text-slate-300 mb-1">
+                Floor Price (Min Price in INR) <span className="text-emerald-400">*</span>
               </label>
-              <input 
-                type="number" 
-                required 
-                name="priceMin" 
-                value={formData.priceMin || ''} 
-                onChange={handleChange} 
-                className="w-full bg-claude-bg border border-claude-border rounded-lg px-3 py-2 text-sm text-claude-text focus:outline-none focus:ring-1 focus:ring-claude-accent" 
-                placeholder="15000000"
+              <input
+                type="number"
+                required
+                min={0}
+                value={formData.priceMin || ''}
+                onChange={e => setFormData({ ...formData, priceMin: Number(e.target.value) })}
+                placeholder="e.g. 5700000"
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
               />
+              <p className="text-[11px] text-emerald-400/90 font-medium mt-1">
+                {formatIndianCurrency(formData.priceMin) ? `Word format: ${formatIndianCurrency(formData.priceMin)}` : 'Enter amount in INR (e.g. 5700000 for 57 Lakh)'}
+              </p>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted mb-1.5">
-                Max Price (₹) {formData.priceMax > 0 && <span className="text-claude-accent font-medium ml-1">({formatIndianCurrency(formData.priceMax)})</span>}
+              <label className="block text-xs font-medium text-slate-300 mb-1">
+                Asking Price (Max Price in INR) <span className="text-emerald-400">*</span>
               </label>
-              <input 
-                type="number" 
-                required 
-                name="priceMax" 
-                value={formData.priceMax || ''} 
-                onChange={handleChange} 
-                className="w-full bg-claude-bg border border-claude-border rounded-lg px-3 py-2 text-sm text-claude-text focus:outline-none focus:ring-1 focus:ring-claude-accent" 
-                placeholder="18000000"
+              <input
+                type="number"
+                required
+                min={0}
+                value={formData.priceMax || ''}
+                onChange={e => setFormData({ ...formData, priceMax: Number(e.target.value) })}
+                placeholder="e.g. 6200000"
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+              />
+              <p className="text-[11px] text-emerald-400/90 font-medium mt-1">
+                {formatIndianCurrency(formData.priceMax) ? `Word format: ${formatIndianCurrency(formData.priceMax)}` : 'Enter amount in INR (e.g. 6200000 for 62 Lakh)'}
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-300 mb-1">Area (Sqft)</label>
+              <input
+                type="number"
+                min={0}
+                value={formData.areaSqft || ''}
+                onChange={e => setFormData({ ...formData, areaSqft: Number(e.target.value) })}
+                placeholder="e.g. 1050"
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted mb-1.5">Area (Sqft)</label>
-              <input 
-                type="number" 
-                required 
-                name="areaSqft" 
-                value={formData.areaSqft || ''} 
-                onChange={handleChange} 
-                className="w-full bg-claude-bg border border-claude-border rounded-lg px-3 py-2 text-sm text-claude-text focus:outline-none focus:ring-1 focus:ring-claude-accent" 
-                placeholder="1850"
+              <label className="block text-xs font-medium text-slate-300 mb-1">Builder / Developer</label>
+              <input
+                type="text"
+                value={formData.builderName}
+                onChange={e => setFormData({ ...formData, builderName: e.target.value })}
+                placeholder="e.g. Godrej Properties"
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted mb-1.5">Builder / Project</label>
-              <input 
-                name="builderName" 
-                value={formData.builderName} 
-                onChange={handleChange} 
-                className="w-full bg-claude-bg border border-claude-border rounded-lg px-3 py-2 text-sm text-claude-text focus:outline-none focus:ring-1 focus:ring-claude-accent" 
-                placeholder="e.g. Prestige Group" 
+              <label className="block text-xs font-medium text-slate-300 mb-1">Possession Date</label>
+              <input
+                type="text"
+                value={formData.possessionDate}
+                onChange={e => setFormData({ ...formData, possessionDate: e.target.value })}
+                placeholder="e.g. Ready to Move or Dec 2026"
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted mb-1.5">Possession Date</label>
-              <input 
-                name="possessionDate" 
-                value={formData.possessionDate} 
-                onChange={handleChange} 
-                className="w-full bg-claude-bg border border-claude-border rounded-lg px-3 py-2 text-sm text-claude-text focus:outline-none focus:ring-1 focus:ring-claude-accent" 
-                placeholder="e.g. Ready to Move or Dec 2026" 
+              <label className="block text-xs font-medium text-slate-300 mb-1">Furnishing</label>
+              <Combobox
+                options={FURNISHING_OPTIONS}
+                value={formData.furnishing}
+                onChange={val => setFormData({ ...formData, furnishing: val })}
               />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted mb-1.5">Furnishing</label>
-              <select 
-                name="furnishing" 
-                value={formData.furnishing} 
-                onChange={handleChange} 
-                className="w-full bg-claude-bg border border-claude-border rounded-lg px-3 py-2 text-sm text-claude-text focus:outline-none focus:ring-1 focus:ring-claude-accent"
-              >
-                {FURNISHING_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
-              </select>
             </div>
           </div>
 
+          {/* Description */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted mb-1.5">Amenities (comma separated)</label>
-            <input 
-              name="amenitiesStr" 
-              value={formData.amenitiesStr} 
-              onChange={handleChange} 
-              className="w-full bg-claude-bg border border-claude-border rounded-lg px-3 py-2 text-sm text-claude-text focus:outline-none focus:ring-1 focus:ring-claude-accent" 
-              placeholder="Pool, Gym, Clubhouse, 24/7 Security, Power Backup" 
-            />
-          </div>
-          
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted mb-1.5">Description</label>
-            <textarea 
-              required 
-              name="description" 
-              value={formData.description} 
-              onChange={handleChange} 
-              rows={3} 
-              className="w-full bg-claude-bg border border-claude-border rounded-lg px-3 py-2 text-sm text-claude-text focus:outline-none focus:ring-1 focus:ring-claude-accent"
-              placeholder="Spacious luxury apartment with lake views..."
+            <label className="block text-xs font-medium text-slate-300 mb-1">Description</label>
+            <textarea
+              rows={3}
+              value={formData.description}
+              onChange={e => setFormData({ ...formData, description: e.target.value })}
+              placeholder="Highlight top features, views, Italian marble, clubhouse, connectivity..."
+              className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white placeholder-slate-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
             />
           </div>
 
-          {/* Visual Images & Presets */}
-          <div className="space-y-3 pt-2 border-t border-claude-border">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted">
-                Property Photos & HD Presets
+          {/* Video Walkthrough Link */}
+          <div>
+            <label className="block text-xs font-medium text-slate-300 mb-1 flex items-center gap-1.5">
+              <VideoCameraIcon className="w-4 h-4 text-emerald-400" /> Video Walkthrough Link (Optional)
+            </label>
+            <input
+              type="url"
+              value={formData.videoUrl}
+              onChange={e => setFormData({ ...formData, videoUrl: e.target.value })}
+              placeholder="e.g. https://youtu.be/sample-walkthrough or Vimeo video URL"
+              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+            />
+          </div>
+
+          {/* Amenities Tag Manager */}
+          <div>
+            <label className="block text-xs font-medium text-slate-300 mb-1">Amenities</label>
+            <div className="flex gap-2 mb-2">
+              <input
+                type="text"
+                value={amenityInput}
+                onChange={e => setAmenityInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddAmenity(); } }}
+                placeholder="e.g. Swimming Pool, Gym, 24/7 Security"
+                className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+              />
+              <button
+                type="button"
+                onClick={handleAddAmenity}
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-medium border border-slate-700 flex items-center gap-1"
+              >
+                <PlusIcon className="w-4 h-4" /> Add
+              </button>
+            </div>
+
+            {formData.amenities.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 p-2.5 bg-slate-950 rounded-lg border border-slate-800">
+                {formData.amenities.map((amenity, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-slate-800 text-slate-200 border border-slate-700"
+                  >
+                    {amenity}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveAmenity(idx)}
+                      className="text-slate-400 hover:text-rose-400"
+                    >
+                      <TrashIcon className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Image Presets & Photo Gallery */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-medium text-slate-300">
+                Property Photos (Shared automatically on WhatsApp matches)
               </label>
-              <div className="flex flex-wrap gap-1.5">
-                <span className="text-xs text-claude-muted mr-1 self-center">1-Click Presets:</span>
+            </div>
+
+            {/* Curated 1-Click Image Presets */}
+            <div className="mb-3 p-3 bg-slate-950 rounded-lg border border-slate-800">
+              <p className="text-[11px] text-slate-400 mb-2 font-medium">⚡ 1-Click Curated HD Photo Presets:</p>
+              <div className="flex flex-wrap gap-2">
                 {CURATED_IMAGE_PRESETS.map((preset) => (
                   <button
                     key={preset.name}
                     type="button"
-                    onClick={() => applyImagePreset(preset.urls)}
-                    className="text-xs bg-claude-bg hover:bg-claude-accent hover:text-white text-claude-text px-2 py-1 rounded border border-claude-border transition-colors"
+                    onClick={() => handleApplyImagePreset(preset.urls)}
+                    className="px-2.5 py-1 bg-slate-900 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 rounded border border-slate-800 hover:border-emerald-500/40 text-xs transition-all"
                   >
-                    {preset.name}
+                    + {preset.name}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Thumbnail Preview Strip */}
-            <div className="flex flex-wrap gap-3 my-2">
-              {imageUrls.filter(Boolean).map((url, i) => (
-                <div key={i} className="relative group w-20 h-20 rounded-lg overflow-hidden border border-claude-border bg-claude-bg">
-                  <img src={url} alt={`Property ${i+1}`} className="w-full h-full object-cover" />
-                  <button
-                    type="button"
-                    onClick={() => removeImageUrl(i)}
-                    className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-red-400 transition-opacity"
-                  >
-                    <TrashIcon className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {/* URL Inputs */}
-            <div className="space-y-2">
-              {imageUrls.map((url, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <input 
-                    value={url} 
-                    onChange={(e) => handleImageUrlChange(i, e.target.value)} 
-                    className="flex-1 bg-claude-bg border border-claude-border rounded-lg px-3 py-1.5 text-xs text-claude-text focus:outline-none focus:ring-1 focus:ring-claude-accent" 
-                    placeholder="https://images.unsplash.com/..." 
-                  />
-                  {imageUrls.length > 1 && (
-                    <button type="button" onClick={() => removeImageUrl(i)} className="p-1.5 text-claude-muted hover:text-red-400">
-                      <TrashIcon className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              ))}
-              <button type="button" onClick={addImageUrl} className="flex items-center gap-1 text-xs text-claude-accent hover:text-white mt-1">
-                <PlusIcon className="w-3.5 h-3.5" /> Add another image URL
+            {/* Custom URL and File Upload */}
+            <div className="flex gap-2 mb-3">
+              <input
+                type="url"
+                value={imageUrlInput}
+                onChange={e => setImageUrlInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddImageUrl(); } }}
+                placeholder="Or paste an Image URL (https://...)"
+                className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+              />
+              <button
+                type="button"
+                onClick={handleAddImageUrl}
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-medium border border-slate-700 flex items-center gap-1"
+              >
+                <PlusIcon className="w-4 h-4" /> Add URL
+              </button>
+              <button
+                type="button"
+                onClick={() => mediaInputRef.current?.click()}
+                className="px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg text-xs font-medium border border-emerald-500/30 flex items-center gap-1"
+              >
+                <PhotoIcon className="w-4 h-4" /> Upload File
               </button>
             </div>
+
+            {/* Image Preview Strip */}
+            {formData.imageUrls.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-slate-950 rounded-lg border border-slate-800">
+                {formData.imageUrls.map((url, idx) => (
+                  <div key={idx} className="relative group rounded-lg overflow-hidden border border-slate-800 aspect-video bg-slate-900">
+                    <img src={url} alt={`Property ${idx}`} className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveImageUrl(idx)}
+                      className="absolute top-1.5 right-1.5 p-1 bg-rose-500/80 hover:bg-rose-600 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <TrashIcon className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-claude-border">
+          {/* Form Actions */}
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
             {onCancel && (
-              <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium text-claude-text bg-claude-card border border-claude-border rounded-lg hover:bg-claude-bg">
+              <button
+                type="button"
+                onClick={onCancel}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition-all"
+              >
                 Cancel
               </button>
             )}
-            <button type="submit" disabled={loading} className="px-6 py-2 text-sm font-medium text-white bg-claude-accent rounded-lg hover:bg-opacity-90 disabled:opacity-50 shadow-lg shadow-claude-accent/20">
-              {loading ? 'Saving to Catalog...' : 'Save Property'}
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-lg text-xs shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50 flex items-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <ArrowPathIcon className="w-4 h-4 animate-spin" /> Saving Property...
+                </>
+              ) : (
+                <>Save to Property Inventory</>
+              )}
             </button>
           </div>
         </form>
