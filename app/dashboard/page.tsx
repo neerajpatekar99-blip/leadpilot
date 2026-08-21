@@ -8,18 +8,16 @@ import { LeadForm } from '@/components/leads/LeadForm';
 import { WhatsAppModal } from '@/components/leads/WhatsAppModal';
 import { ConversationView } from '@/components/leads/ConversationView';
 import { SettingsModal } from '@/components/leads/SettingsModal';
-import { ListingsTable } from '@/components/listings/ListingsTable';
-import { ListingForm } from '@/components/listings/ListingForm';
 import { TasksWidget } from '@/components/dashboard/TasksWidget';
 import { VisitsWidget } from '@/components/dashboard/VisitsWidget';
 import { Modal } from '@/components/ui/Modal';
-import { Lead, Listing } from '@/lib/types';
+import { Lead } from '@/lib/types';
+import Link from 'next/link';
 import { PlusIcon, Cog6ToothIcon, MagnifyingGlassIcon, UsersIcon, ExclamationCircleIcon, CheckCircleIcon, Squares2X2Icon, ListBulletIcon, LightBulbIcon, ArrowPathIcon, XMarkIcon, BuildingOffice2Icon, ChatBubbleOvalLeftIcon } from '@heroicons/react/24/outline';
 
 const fetcher = (url: string) => fetch(url).then(res => res.json()).then(data => data.data);
 
 export default function DashboardPage() {
-  const [activeTab, setActiveTab] = useState<'leads' | 'listings'>('leads');
   
   // Leads State via SWR
   const { data: leadsRaw, error: leadsError, mutate: mutateLeads } = useSWR<Lead[]>('/api/leads', fetcher, { 
@@ -43,14 +41,8 @@ export default function DashboardPage() {
   const [sendingBulk, setSendingBulk] = useState(false);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
 
-  // Listings State via SWR
-  const { data: listingsRaw, error: listingsError, mutate: mutateListings } = useSWR<Listing[]>('/api/listings', fetcher, { fallbackData: [] });
-  const listings = listingsRaw || [];
-  const loadingListings = !listingsRaw && !listingsError;
-
   // Modals State
   const [isAddLeadModalOpen, setIsAddLeadModalOpen] = useState(false);
-  const [isAddListingModalOpen, setIsAddListingModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [selectedLeadForChat, setSelectedLeadForChat] = useState<Lead | null>(null);
   const [selectedLeadForWhatsApp, setSelectedLeadForWhatsApp] = useState<Lead | null>(null);
@@ -65,20 +57,12 @@ export default function DashboardPage() {
     mutateLeads();
   };
 
-  const handleListingAdded = () => {
-    setIsAddListingModalOpen(false);
-    mutateListings();
-  };
-
   const handlePropertyMatch = async (forceQuery?: string) => {
     const queryToUse = forceQuery || propertySearchQuery;
     if (!queryToUse.trim()) {
       setMatchedLeadIds(null);
       return;
     }
-    
-    // Switch to leads tab automatically if matching from another tab
-    if (activeTab !== 'leads') setActiveTab('leads');
     
     setIsMatching(true);
     try {
@@ -96,12 +80,6 @@ export default function DashboardPage() {
     } finally {
       setIsMatching(false);
     }
-  };
-
-  const handleSmartMatchFromListing = (listing: Listing) => {
-    const query = `${listing.type} in ${listing.locality} priced around ${listing.price}`;
-    setPropertySearchQuery(query);
-    handlePropertyMatch(query);
   };
 
   const clearPropertyMatch = () => {
@@ -163,17 +141,16 @@ export default function DashboardPage() {
             <h1 className="text-3xl font-bold font-serif">LeadPilot CRM</h1>
             <div className="hidden md:flex bg-claude-card border border-claude-border rounded-lg p-1">
               <button 
-                onClick={() => setActiveTab('leads')}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'leads' ? 'bg-claude-bg text-claude-text shadow-sm' : 'text-claude-muted hover:text-claude-text'}`}
+                className="flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-colors bg-claude-bg text-claude-text shadow-sm"
               >
                 <UsersIcon className="w-4 h-4" /> Leads
               </button>
-              <button 
-                onClick={() => setActiveTab('listings')}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'listings' ? 'bg-claude-bg text-claude-text shadow-sm' : 'text-claude-muted hover:text-claude-text'}`}
+              <Link 
+                href="/dashboard/properties"
+                className="flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-colors text-claude-muted hover:text-claude-text"
               >
-                <BuildingOffice2Icon className="w-4 h-4" /> Listings
-              </button>
+                <BuildingOffice2Icon className="w-4 h-4" /> Properties
+              </Link>
             </div>
           </div>
           
@@ -186,11 +163,11 @@ export default function DashboardPage() {
               <Cog6ToothIcon className="w-5 h-5" />
             </button>
             <button 
-              onClick={() => activeTab === 'leads' ? setIsAddLeadModalOpen(true) : setIsAddListingModalOpen(true)}
+              onClick={() => setIsAddLeadModalOpen(true)}
               className="flex-1 md:flex-none px-4 py-2.5 bg-claude-accent text-white rounded-lg hover:bg-[#C86445] shadow-sm font-medium flex items-center justify-center gap-2 transition-colors"
             >
               <PlusIcon className="w-4 h-4" />
-              Add {activeTab === 'leads' ? 'Lead' : 'Listing'}
+              Add Lead
             </button>
           </div>
         </div>
@@ -198,22 +175,20 @@ export default function DashboardPage() {
         {/* Mobile Tabs */}
         <div className="flex md:hidden bg-claude-card border border-claude-border rounded-lg p-1">
           <button 
-            onClick={() => setActiveTab('leads')}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'leads' ? 'bg-claude-bg text-claude-text shadow-sm' : 'text-claude-muted hover:text-claude-text'}`}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors bg-claude-bg text-claude-text shadow-sm"
           >
             <UsersIcon className="w-4 h-4" /> Leads
           </button>
-          <button 
-            onClick={() => setActiveTab('listings')}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'listings' ? 'bg-claude-bg text-claude-text shadow-sm' : 'text-claude-muted hover:text-claude-text'}`}
+          <Link 
+            href="/dashboard/properties"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors text-claude-muted hover:text-claude-text"
           >
-            <BuildingOffice2Icon className="w-4 h-4" /> Listings
-          </button>
+            <BuildingOffice2Icon className="w-4 h-4" /> Properties
+          </Link>
         </div>
 
-        {/* Tab Content: LEADS */}
-        {activeTab === 'leads' && (
-          <>
+        {/* Dashboard Content */}
+        <>
             {/* Widgets Section (Tasks & Visits) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[350px]">
               <TasksWidget />
@@ -333,20 +308,11 @@ export default function DashboardPage() {
               )
             )}
           </>
-        )}
 
-        {/* Tab Content: LISTINGS */}
-        {activeTab === 'listings' && (
-          <ListingsTable 
-            listings={listings}
-            loading={loadingListings}
-            onSmartMatch={handleSmartMatchFromListing}
-          />
-        )}
       </div>
 
       {/* Floating Bulk Action Bar */}
-      {selectedLeads.length > 0 && activeTab === 'leads' && viewMode === 'table' && (
+      {selectedLeads.length > 0 && viewMode === 'table' && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-claude-card border border-claude-border shadow-2xl rounded-full px-6 py-3 flex items-center gap-6 animate-in slide-in-from-bottom-5 z-40">
           <div className="text-sm font-medium">
             <span className="text-claude-accent">{selectedLeads.length}</span> leads selected
@@ -375,14 +341,6 @@ export default function DashboardPage() {
         title="Add New Lead"
       >
         <LeadForm onSuccess={handleLeadAdded} />
-      </Modal>
-
-      <Modal 
-        isOpen={isAddListingModalOpen} 
-        onClose={() => setIsAddListingModalOpen(false)} 
-        title="Add New Property Listing"
-      >
-        <ListingForm onSuccess={handleListingAdded} />
       </Modal>
 
       <Modal 

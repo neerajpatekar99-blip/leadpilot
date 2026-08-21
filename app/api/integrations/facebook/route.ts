@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { createLead, getLeadByPhone } from '@/lib/firestore/leads';
 import { sendFirstMessage } from '@/lib/firstMessage';
+import { getAgentProfile } from '@/lib/firestore/agent';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -57,14 +58,7 @@ export async function POST(request: Request) {
           consentStatus: 'opted_in',
         });
 
-        const agentProfile = {
-          id: 'agent1',
-          name: 'Rahul',
-          agencyName: 'LeadPilot Realty',
-          phone: '',
-          specializations: [],
-          activeLocalities: []
-        };
+        const agentProfile = await getAgentProfile();
 
         // Fire and forget
         sendFirstMessage(lead, agentProfile).catch(console.error);

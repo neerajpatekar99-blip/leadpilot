@@ -4,6 +4,8 @@ import { generateAIResponse } from '@/lib/groq';
 import { sendWhatsAppMessage } from '@/lib/whatsapp';
 import { createTask } from '@/lib/firestore/tasks';
 import { createVisit } from '@/lib/firestore/visits';
+import { findMatchingProperties } from '@/lib/firestore/properties';
+import { getAgentProfile } from '@/lib/firestore/agent';
 
 export async function POST(request: Request) {
   try {
@@ -33,22 +35,26 @@ export async function POST(request: Request) {
       timestamp: Date.now(),
     });
 
-    // Hardcode an AgentProfile for testing
-    const agentProfile = {
-      id: 'agent1',
-      name: 'Rahul',
-      agencyName: 'LeadPilot Realty',
-      phone: '',
-      specializations: [],
-      activeLocalities: []
-    };
+    // Fetch dynamic agent profile & custom instructions
+    const agentProfile = await getAgentProfile();
+
+    // Find matching properties if we have enough lead context
+    let matchingProperties: any[] = [];
+    if (lead.budget && (lead.locality || lead.propertyType)) {
+      matchingProperties = await findMatchingProperties(
+        lead.budget, 
+        lead.locality || null, 
+        lead.propertyType || null
+      );
+    }
 
     // Generate AI response
     const { message: aiResponse, needsAgent, extractedInfo } = await generateAIResponse(
       lead, 
       history, 
       message, 
-      agentProfile
+      agentProfile,
+      matchingProperties
     );
 
     // Save AI message
@@ -65,7 +71,6 @@ export async function POST(request: Request) {
     }
 
     // Update lead fields based on extraction or qualification
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updates: any = {};
     let shouldUpdateLead = false;
 
@@ -135,8 +140,17 @@ export async function POST(request: Request) {
         });
       }
     }
+    
+    let topMatchImages: string[] = [];
+    if (matchingProperties.length > 0 && matchingProperties[0].imageUrls?.length > 0) {
+      topMatchImages = matchingProperties[0].imageUrls;
+    }
 
-    return NextResponse.json({ response: aiResponse, needsAgent });
+    return NextResponse.json({ 
+      response: aiResponse, 
+      needsAgent,
+      topMatchImages: topMatchImages.length > 0 ? topMatchImages : undefined
+    });
   } catch (error) {
     console.error('Chat API Error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

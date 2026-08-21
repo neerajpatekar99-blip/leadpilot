@@ -63,9 +63,9 @@ export function PipelineView({ leads, onSelectLead, onWhatsAppClick }: PipelineV
                   </div>
 
                   <div className="flex justify-between items-center mt-2 pt-3 border-t border-claude-border/50">
-                    <Badge variant={
-                      lead.aiStatus === 'ai_handling' ? 'new' : 
-                      lead.aiStatus === 'needs_agent' ? 'closed' : 'contacted'
+                    <Badge color={
+                      lead.aiStatus === 'ai_handling' ? 'purple' : 
+                      lead.aiStatus === 'needs_agent' ? 'red' : 'blue'
                     }>
                       {lead.aiStatus.replace('_', ' ')}
                     </Badge>

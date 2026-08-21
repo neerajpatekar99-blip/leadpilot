@@ -23,8 +23,7 @@ export function LeadForm({ onSuccess }: { onSuccess: () => void }) {
 
     const payload: Partial<Lead> = {
       ...formData,
-      // @ts-expect-error
-      source: formData.source,
+      source: formData.source as Lead['source'],
       consentStatus: consentChecked ? 'opted_in' : 'pending',
     };
 
@@ -62,6 +61,7 @@ export function LeadForm({ onSuccess }: { onSuccess: () => void }) {
           value={formData.name}
           onChange={(e) => setFormData({...formData, name: e.target.value})}
           className={inputClasses}
+          placeholder="e.g. Ananya Deshmukh"
         />
       </div>
 
@@ -81,6 +81,7 @@ export function LeadForm({ onSuccess }: { onSuccess: () => void }) {
         <label className={labelClasses}>Email Address</label>
         <input
           type="email"
+          placeholder="e.g. ananya@gmail.com"
           value={formData.email}
           onChange={(e) => setFormData({...formData, email: e.target.value})}
           className={inputClasses}
@@ -98,6 +99,7 @@ export function LeadForm({ onSuccess }: { onSuccess: () => void }) {
           <option value="99acres">99acres</option>
           <option value="magicbricks">MagicBricks</option>
           <option value="facebook_ads">Facebook Ads</option>
+          <option value="whatsapp_inbound">WhatsApp Inbound</option>
         </select>
       </div>
 
@@ -108,6 +110,7 @@ export function LeadForm({ onSuccess }: { onSuccess: () => void }) {
           value={formData.notes}
           onChange={(e) => setFormData({...formData, notes: e.target.value})}
           className={inputClasses}
+          placeholder="Client preferences, budget notes, etc."
         />
       </div>
 

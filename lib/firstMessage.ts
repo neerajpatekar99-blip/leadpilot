@@ -3,28 +3,37 @@ import { Lead, AgentProfile } from './types';
 import { sendWhatsAppMessage } from './whatsapp';
 import { saveMessage, updateLead } from './firestore/leads';
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY || 'dummy' });
+function getGroqClient(): Groq {
+  const apiKey = process.env.GROQ_API_KEY?.trim() || '';
+  return new Groq({ apiKey });
+}
 
 export async function sendFirstMessage(lead: Lead, agentProfile: AgentProfile): Promise<{ success: boolean; reason?: string }> {
   if (lead.consentStatus !== 'opted_in') {
     return { success: false, reason: 'No consent provided' };
   }
 
-  const systemPrompt = `You are a real estate assistant working for ${agentProfile.name} at ${agentProfile.agencyName} in India.
-Your goal is to write a warm, short opening WhatsApp message to a new lead named ${lead.name || 'there'}.
+  const agentName = agentProfile.name || 'Sachin Bhoir';
+  const agencyName = agentProfile.agencyName || 'One Stop Property Solutions';
+
+  const systemPrompt = `You are a professional real estate assistant working for ${agentName} at ${agencyName} in India.
+Your goal is to write a warm, single-line opening WhatsApp greeting to a new lead named ${lead.name || 'there'}.
 
 RULES:
-1. Write in Hinglish (a natural mix of Hindi and English).
-2. Keep it under 2 sentences.
-3. Be friendly and polite, not salesy.
-4. Ask a simple open-ended question about what kind of property they are looking for (e.g., budget or locality).
-5. Do not use more than one emoji.
-6. Do not include any tags, just the message text itself.`;
+1. Keep the reply strictly to ONE line.
+2. Never use dashes (hyphens or em dashes). Use commas or full stops instead.
+3. Be professional and warm. Ask a single question about what area or property type they are looking for.
+4. Match natural Indian tone (Hinglish or English).
+5. At most one emoji, only if natural.
+6. Do not include any tags, just the single-line message text itself.
+
+EXAMPLE:
+"Hi ${lead.name || ''}, happy to help you find the right property. Which area are you looking at?"`;
 
   try {
-    const chatCompletion = await groq.chat.completions.create({
+    const chatCompletion = await getGroqClient().chat.completions.create({
       messages: [{ role: 'system', content: systemPrompt }],
-      model: 'llama-3.3-70b-versatile',
+      model: 'groq/compound-mini',
     });
 
     const aiMessage = chatCompletion.choices[0]?.message?.content?.trim();

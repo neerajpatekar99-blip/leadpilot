@@ -42,7 +42,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Validation failed', details: result.error.format() }, { status: 400 });
     }
 
-    const newLead = await createLead(result.data);
+    const newLead = await createLead(result.data as any);
     return NextResponse.json({ success: true, data: newLead });
   } catch (error) {
     console.error('Error creating lead:', error);

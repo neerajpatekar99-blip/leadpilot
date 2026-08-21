@@ -38,9 +38,9 @@ export function LeadTable({ leads, loading, onViewChat, onSendWhatsApp, selected
     switch (status) {
       case 'new': return 'blue';
       case 'contacted': return 'yellow';
-      case 'replied': return 'orange';
-      case 'qualified': return 'green';
-      case 'closed': return 'gray';
+      case 'site_visit': return 'purple';
+      case 'negotiation': return 'orange';
+      case 'closed': return 'green';
       default: return 'gray';
     }
   };

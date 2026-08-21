@@ -19,15 +19,23 @@ export interface Lead {
   deletedAt?: number;
 }
 
-export interface Listing {
+export interface Property {
   id: string;
   title: string;
-  price: string;
-  type: string;
+  propertyType: '1BHK' | '2BHK' | '3BHK' | '4BHK' | 'villa' | 'plot' | 'office' | 'shop';
   locality: string;
-  mediaUrls?: string[];
-  status: 'Active' | 'Sold' | 'Draft';
+  priceMin: number;
+  priceMax: number;
+  areaSqft: number;
+  amenities: string[];
+  imageUrls: string[];
+  status: 'available' | 'sold' | 'on_hold';
+  description: string;
+  builderName?: string;
+  possessionDate?: string;
+  furnishing?: 'unfurnished' | 'semi_furnished' | 'fully_furnished';
   createdAt: number;
+  updatedAt?: number;
 }
 
 export interface SiteVisit {
@@ -67,4 +75,8 @@ export interface AgentProfile {
   phone: string;
   specializations: string[];
   activeLocalities: string[];
+  customInstructions?: string;
+  tone?: 'friendly' | 'professional' | 'luxury' | 'casual' | 'custom';
+  languagePreference?: 'hinglish' | 'english' | 'hindi' | 'auto';
+  updatedAt?: number;
 }

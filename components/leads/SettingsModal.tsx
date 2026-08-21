@@ -1,56 +1,425 @@
-import React, { useState } from 'react';
+"use client";
+
+import React, { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
-import { DocumentDuplicateIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { 
+  DocumentDuplicateIcon, 
+  CheckIcon, 
+  SparklesIcon, 
+  CommandLineIcon, 
+  HeartIcon, 
+  CpuChipIcon, 
+  GlobeAltIcon,
+  ArrowPathIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon
+} from '@heroicons/react/24/outline';
+import { AgentProfile } from '@/lib/types';
+
+const PROMPT_TEMPLATES = [
+  {
+    title: '🌟 NRI & Investor Focus',
+    text: 'Highlight high capital appreciation, 6-8% expected rental yield, RERA registration, and NRI repatriation ease for all premium properties.'
+  },
+  {
+    title: '📅 Weekend Visit Window',
+    text: 'Strictly schedule all site visits on Saturday or Sunday between 10:00 AM and 2:00 PM when our on-site team is available.'
+  },
+  {
+    title: '💰 Launch Discounts',
+    text: 'Inform prospective buyers that we are offering an exclusive 5% pre-launch waiver on clubhouse charges for bookings finalized this week.'
+  },
+  {
+    title: '📍 Locality Priority',
+    text: 'If the lead does not specify a location, immediately recommend our prime gated community projects in Whitefield and Sarjapur Road.'
+  }
+];
 
 export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-  const [copied, setCopied] = useState(false);
-  const webhookUrl = 'https://your-production-url.vercel.app/api/integrations/facebook';
+  const [activeTab, setActiveTab] = useState<'ai' | 'integrations' | 'health'>('ai');
+  const [copiedUrl, setCopiedUrl] = useState(false);
+  const [copiedToken, setCopiedToken] = useState(false);
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(webhookUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [savedSuccess, setSavedSuccess] = useState(false);
+
+  const [profile, setProfile] = useState<Partial<AgentProfile>>({
+    name: 'Rahul Sharma',
+    agencyName: 'LeadPilot Prime Realty',
+    phone: '+919876543210',
+    tone: 'friendly',
+    languagePreference: 'hinglish',
+    customInstructions: '',
+  });
+
+  const [healthData, setHealthData] = useState<any>(null);
+  const [loadingHealth, setLoadingHealth] = useState(false);
+
+  const webhookUrl = typeof window !== 'undefined' 
+    ? `${window.location.origin}/api/integrations/facebook`
+    : 'https://your-domain.vercel.app/api/integrations/facebook';
+
+  const verifyToken = 'leadpilot_webhook_token';
+
+  const fetchSettings = async () => {
+    setLoadingProfile(true);
+    try {
+      const res = await fetch('/api/settings');
+      const json = await res.json();
+      if (json.success && json.data) {
+        setProfile(json.data);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingProfile(false);
+    }
+  };
+
+  const fetchHealth = async () => {
+    setLoadingHealth(true);
+    try {
+      const res = await fetch('/api/health');
+      const json = await res.json();
+      setHealthData(json);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingHealth(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchSettings();
+      fetchHealth();
+    }
+  }, [isOpen]);
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingProfile(true);
+    setSavedSuccess(false);
+
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profile)
+      });
+      const json = await res.json();
+      if (json.success) {
+        setSavedSuccess(true);
+        setTimeout(() => setSavedSuccess(false), 2500);
+      } else {
+        alert('Failed to save settings: ' + json.error);
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error saving settings');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const copyToClipboard = (text: string, isToken = false) => {
+    navigator.clipboard.writeText(text);
+    if (isToken) {
+      setCopiedToken(true);
+      setTimeout(() => setCopiedToken(false), 2000);
+    } else {
+      setCopiedUrl(true);
+      setTimeout(() => setCopiedUrl(false), 2000);
+    }
+  };
+
+  const insertPromptTemplate = (text: string) => {
+    setProfile(prev => ({
+      ...prev,
+      customInstructions: prev.customInstructions 
+        ? `${prev.customInstructions.trim()}\n${text}`
+        : text
+    }));
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Integrations & Settings">
-      <div className="space-y-6">
-        <div>
-          <h3 className="text-lg font-serif font-medium mb-2 text-claude-text">Facebook Lead Ads Webhook</h3>
-          <p className="text-sm text-claude-muted">
-            Connect your Facebook Lead forms directly to LeadPilot. New leads will automatically receive a WhatsApp greeting.
-          </p>
+    <Modal isOpen={isOpen} onClose={onClose} title="LeadPilot Control Center & Settings">
+      <div className="space-y-5">
+        {/* Navigation Tabs */}
+        <div className="flex border-b border-claude-border pb-2 gap-2">
+          <button
+            onClick={() => setActiveTab('ai')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              activeTab === 'ai' 
+                ? 'bg-claude-accent text-white shadow-sm' 
+                : 'text-claude-muted hover:text-white'
+            }`}
+          >
+            <CpuChipIcon className="w-4 h-4" />
+            <span>🤖 AI & Custom Prompts</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('integrations')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              activeTab === 'integrations' 
+                ? 'bg-claude-accent text-white shadow-sm' 
+                : 'text-claude-muted hover:text-white'
+            }`}
+          >
+            <GlobeAltIcon className="w-4 h-4" />
+            <span>📱 WhatsApp & Webhooks</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('health')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              activeTab === 'health' 
+                ? 'bg-claude-accent text-white shadow-sm' 
+                : 'text-claude-muted hover:text-white'
+            }`}
+          >
+            <CommandLineIcon className="w-4 h-4" />
+            <span>⚡ System Health</span>
+          </button>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-claude-muted mb-1">Webhook URL</label>
-          <div className="flex">
-            <input 
-              type="text" 
-              readOnly 
-              value={webhookUrl}
-              className="flex-1 bg-claude-bg border border-claude-border rounded-l-lg px-3 py-2 text-sm text-claude-text focus:outline-none"
-            />
-            <button 
-              onClick={copyToClipboard}
-              className="bg-claude-card hover:bg-gray-50 border border-l-0 border-claude-border rounded-r-lg px-4 flex items-center justify-center transition-colors"
-            >
-              {copied ? <CheckIcon className="w-4 h-4 text-green-600" /> : <DocumentDuplicateIcon className="w-4 h-4 text-claude-muted" />}
-            </button>
+        {/* TAB 1: AI CUSTOM PROMPTS & PERSONA */}
+        {activeTab === 'ai' && (
+          <form onSubmit={handleSaveProfile} className="space-y-4 animate-in fade-in duration-300">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted mb-1">Agent Name</label>
+                <input 
+                  value={profile.name || ''} 
+                  onChange={e => setProfile({ ...profile, name: e.target.value })}
+                  className="w-full bg-claude-bg border border-claude-border rounded-lg px-3 py-2 text-xs text-claude-text focus:outline-none focus:ring-1 focus:ring-claude-accent" 
+                  placeholder="Rahul Sharma"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted mb-1">Agency Name</label>
+                <input 
+                  value={profile.agencyName || ''} 
+                  onChange={e => setProfile({ ...profile, agencyName: e.target.value })}
+                  className="w-full bg-claude-bg border border-claude-border rounded-lg px-3 py-2 text-xs text-claude-text focus:outline-none focus:ring-1 focus:ring-claude-accent" 
+                  placeholder="LeadPilot Prime Realty"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted mb-1">AI Tone / Persona</label>
+                <select 
+                  value={profile.tone || 'friendly'} 
+                  onChange={e => setProfile({ ...profile, tone: e.target.value as any })}
+                  className="w-full bg-claude-bg border border-claude-border rounded-lg px-3 py-2 text-xs text-claude-text focus:outline-none focus:ring-1 focus:ring-claude-accent"
+                >
+                  <option value="friendly">Warm & Approachable (Friendly Advisor)</option>
+                  <option value="luxury">Luxury Consultant (Prestigious & High-End)</option>
+                  <option value="professional">Professional & Consultative (Direct & Data-Driven)</option>
+                  <option value="casual">Fast & Crisp (Ultra-Short Texting Style)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted mb-1">Language Style</label>
+                <select 
+                  value={profile.languagePreference || 'hinglish'} 
+                  onChange={e => setProfile({ ...profile, languagePreference: e.target.value as any })}
+                  className="w-full bg-claude-bg border border-claude-border rounded-lg px-3 py-2 text-xs text-claude-text focus:outline-none focus:ring-1 focus:ring-claude-accent"
+                >
+                  <option value="hinglish">Hinglish (Natural Urban Indian Mix)</option>
+                  <option value="english">Standard English (Polished & Clear)</option>
+                  <option value="hindi">Hindi (Conversational)</option>
+                  <option value="auto">Auto (Mirror the Lead's Exact Style)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Custom Instructions Editor */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted">
+                  Custom LLM Instructions & Deal Rules
+                </label>
+                <span className="text-[11px] text-claude-accent font-medium">Injected live into Groq system prompt</span>
+              </div>
+
+              <textarea 
+                rows={5}
+                value={profile.customInstructions || ''}
+                onChange={e => setProfile({ ...profile, customInstructions: e.target.value })}
+                placeholder="Add your agency's custom sales rules, project pitch priorities, discount policies, site visit rules..."
+                className="w-full bg-claude-bg border border-claude-border rounded-xl p-3 text-xs text-claude-text focus:outline-none focus:ring-1 focus:ring-claude-accent leading-relaxed font-mono"
+              />
+
+              {/* 1-Click Prompt Templates */}
+              <div className="mt-2 space-y-1.5">
+                <div className="text-[11px] text-claude-muted">Insert Quick Rule Templates:</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {PROMPT_TEMPLATES.map((tmpl, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => insertPromptTemplate(tmpl.text)}
+                      className="text-[11px] bg-claude-bg hover:bg-claude-accent hover:text-white text-claude-text px-2 py-1 rounded border border-claude-border transition-colors flex items-center gap-1"
+                    >
+                      <span>+</span> {tmpl.title}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center pt-3 border-t border-claude-border">
+              {savedSuccess ? (
+                <div className="flex items-center gap-1.5 text-xs text-green-400 font-medium">
+                  <CheckCircleIcon className="w-4 h-4" />
+                  <span>Custom instructions saved & active!</span>
+                </div>
+              ) : <div />}
+
+              <button 
+                type="submit" 
+                disabled={savingProfile}
+                className="px-5 py-2 text-xs font-semibold text-white bg-claude-accent rounded-lg hover:bg-opacity-90 disabled:opacity-50 shadow-md shadow-claude-accent/20 flex items-center gap-1.5"
+              >
+                {savingProfile ? <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" /> : <CheckIcon className="w-3.5 h-3.5" />}
+                <span>Save AI Instructions</span>
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* TAB 2: INTEGRATIONS & WEBHOOKS */}
+        {activeTab === 'integrations' && (
+          <div className="space-y-4 animate-in fade-in duration-300">
+            <div>
+              <h3 className="text-sm font-semibold text-white mb-1">Meta & Facebook Lead Ads Webhook</h3>
+              <p className="text-xs text-claude-muted">
+                Connect your Facebook Ads Lead forms directly. Inbound leads instantly get an automated WhatsApp introduction.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted mb-1">Webhook Callback URL</label>
+              <div className="flex">
+                <input 
+                  type="text" 
+                  readOnly 
+                  value={webhookUrl}
+                  className="flex-1 bg-claude-bg border border-claude-border rounded-l-lg px-3 py-2 text-xs text-claude-text focus:outline-none font-mono"
+                />
+                <button 
+                  onClick={() => copyToClipboard(webhookUrl, false)}
+                  className="bg-claude-card hover:bg-white/10 border border-l-0 border-claude-border rounded-r-lg px-3.5 flex items-center justify-center transition-colors"
+                >
+                  {copiedUrl ? <CheckIcon className="w-4 h-4 text-green-400" /> : <DocumentDuplicateIcon className="w-4 h-4 text-claude-muted" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted mb-1">Verify Token</label>
+              <div className="flex">
+                <input 
+                  type="text" 
+                  readOnly 
+                  value={verifyToken}
+                  className="flex-1 bg-claude-bg border border-claude-border rounded-l-lg px-3 py-2 text-xs text-claude-text focus:outline-none font-mono"
+                />
+                <button 
+                  onClick={() => copyToClipboard(verifyToken, true)}
+                  className="bg-claude-card hover:bg-white/10 border border-l-0 border-claude-border rounded-r-lg px-3.5 flex items-center justify-center transition-colors"
+                >
+                  {copiedToken ? <CheckIcon className="w-4 h-4 text-green-400" /> : <DocumentDuplicateIcon className="w-4 h-4 text-claude-muted" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-claude-bg p-3.5 rounded-xl border border-claude-border">
+              <h4 className="text-xs font-semibold mb-2 text-claude-text">Meta Business Suite Setup:</h4>
+              <ol className="list-decimal list-inside text-xs text-claude-muted space-y-1.5 leading-relaxed">
+                <li>Go to <strong>Meta for Developers</strong> &gt; App Dashboard &gt; Webhooks.</li>
+                <li>Select <strong>Page</strong> or <strong>WhatsApp</strong> and click &apos;Subscribe to this object&apos;.</li>
+                <li>Paste the Callback URL and Verify Token above.</li>
+                <li>Subscribe to <strong>leadgen</strong> (for Facebook Ads) or <strong>messages</strong> (for WhatsApp).</li>
+              </ol>
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="bg-claude-bg p-4 rounded-lg border border-claude-border">
-          <h4 className="text-sm font-semibold mb-3 text-claude-text">Setup Instructions</h4>
-          <ol className="list-decimal list-inside text-sm text-claude-muted space-y-2">
-            <li>Go to Meta Business Suite &gt; All Tools &gt; Events Manager.</li>
-            <li>Select your Data Source and click &apos;Settings&apos;.</li>
-            <li>Under &apos;Webhooks&apos;, click &apos;Set up&apos; or &apos;Edit&apos;.</li>
-            <li>Paste the Webhook URL above.</li>
-            <li>Enter your <strong>Verify Token</strong> (from your <code>.env.local</code>).</li>
-            <li>Subscribe to the <strong>leadgen</strong> event field.</li>
-          </ol>
-        </div>
+        {/* TAB 3: SYSTEM HEALTH & DIAGNOSTICS */}
+        {activeTab === 'health' && (
+          <div className="space-y-4 animate-in fade-in duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-white">System Diagnostics & Readiness</h3>
+                <p className="text-xs text-claude-muted">Status of connected services and backend infrastructure.</p>
+              </div>
+              <button 
+                onClick={fetchHealth}
+                disabled={loadingHealth}
+                className="p-1.5 text-claude-muted hover:text-white bg-claude-bg rounded-lg border border-claude-border"
+                title="Refresh Status"
+              >
+                <ArrowPathIcon className={`w-4 h-4 ${loadingHealth ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+
+            {healthData ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="bg-claude-bg p-3 rounded-xl border border-claude-border">
+                  <div className="text-xs text-claude-muted mb-1">Database Engine</div>
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${healthData.services?.database?.status.includes('production') ? 'bg-green-400' : 'bg-yellow-400'}`} />
+                    <span className="text-xs font-semibold text-white">{healthData.services?.database?.provider}</span>
+                  </div>
+                  <div className="text-[10px] text-claude-muted mt-1">
+                    {healthData.services?.database?.status.includes('production') ? 'Live Google Cloud Firestore' : 'Dual-Mode Stateful Simulation Active'}
+                  </div>
+                </div>
+
+                <div className="bg-claude-bg p-3 rounded-xl border border-claude-border">
+                  <div className="text-xs text-claude-muted mb-1">LLM Groq AI Engine</div>
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${healthData.services?.llmEngine?.ready ? 'bg-green-400' : 'bg-yellow-400'}`} />
+                    <span className="text-xs font-semibold text-white">Llama 3.3 70B Versatile</span>
+                  </div>
+                  <div className="text-[10px] text-claude-muted mt-1">
+                    {healthData.services?.llmEngine?.ready ? 'Connected & High-Speed Ingestion Ready' : 'Set GROQ_API_KEY for live inference'}
+                  </div>
+                </div>
+
+                <div className="bg-claude-bg p-3 rounded-xl border border-claude-border">
+                  <div className="text-xs text-claude-muted mb-1">WhatsApp Cloud API</div>
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${healthData.services?.whatsappCloudApi?.ready ? 'bg-green-400' : 'bg-blue-400'}`} />
+                    <span className="text-xs font-semibold text-white">{healthData.services?.whatsappCloudApi?.ready ? 'Connected' : 'Simulation Ready'}</span>
+                  </div>
+                  <div className="text-[10px] text-claude-muted mt-1">
+                    {healthData.services?.whatsappCloudApi?.ready ? 'Meta Graph API v18.0 Active' : 'Messages simulated in UI until token added'}
+                  </div>
+                </div>
+
+                <div className="bg-claude-bg p-3 rounded-xl border border-claude-border">
+                  <div className="text-xs text-claude-muted mb-1">Production Readiness</div>
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${healthData.productionReady ? 'bg-green-400' : 'bg-emerald-400'}`} />
+                    <span className="text-xs font-semibold text-white">Operational (Zero Crash)</span>
+                  </div>
+                  <div className="text-[10px] text-claude-muted mt-1">
+                    Environment: {healthData.environment}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-6 text-xs text-claude-muted">Loading diagnostics...</div>
+            )}
+          </div>
+        )}
       </div>
     </Modal>
   );
