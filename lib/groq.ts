@@ -138,17 +138,19 @@ You must output a JSON object containing:
     try {
       chatCompletion = await getGroqClient().chat.completions.create({
         messages,
-        model: 'llama-3.3-70b-versatile',
-        response_format: { type: 'json_object' },
-        temperature: 0.2,
-      });
-    } catch (primaryErr) {
-      console.warn('Primary model error, falling back to llama-3.1-8b-instant:', primaryErr);
-      chatCompletion = await getGroqClient().chat.completions.create({
-        messages,
         model: 'llama-3.1-8b-instant',
         response_format: { type: 'json_object' },
         temperature: 0.2,
+        max_tokens: 350,
+      });
+    } catch (primaryErr) {
+      console.warn('Primary model error, falling back to llama-3.3-70b-versatile:', primaryErr);
+      chatCompletion = await getGroqClient().chat.completions.create({
+        messages,
+        model: 'llama-3.3-70b-versatile',
+        response_format: { type: 'json_object' },
+        temperature: 0.2,
+        max_tokens: 350,
       });
     }
 

@@ -6,7 +6,6 @@ import makeWASocket, {
 import pino from 'pino';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
-import * as fs from 'fs';
 import QRCode from 'qrcode';
 import { getLeadByPhone, createLead, saveMessage, getConversation, updateLead } from '../lib/firestore/leads';
 import { generateAIResponse } from '../lib/groq';
@@ -14,15 +13,40 @@ import { getAgentProfile } from '../lib/firestore/agent';
 import { findMatchingProperties } from '../lib/firestore/properties';
 import { createTask } from '../lib/firestore/tasks';
 import { createVisit } from '../lib/firestore/visits';
+import { AgentProfile, Message, Lead } from '../lib/types';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
 
 const TARGET_PHONE = process.env.WHATSAPP_LINK_PHONE || '919870178204'; // Sachin Sir's number
 const AUTH_DIR = path.resolve(__dirname, '../whatsapp_auth_info');
 
+// In-Memory High Speed Caches (0ms retrieval)
+const recentMessagesCache = new Map<string, Message[]>();
+const leadsCache = new Map<string, Lead>();
+let cachedAgentProfile: AgentProfile = {
+  name: 'Sachin Bhoir',
+  agencyName: 'One Stop Property Solutions',
+  phone: '+919876543210',
+  tone: 'friendly',
+  languagePreference: 'hinglish',
+  customInstructions: '1. Only discuss real estate: properties, pricing, localities, site visits, buying, selling, renting.\n2. Keep responses to ONE line without dashes.\n3. Escalate only for confirmed site visit booking or token payments.',
+  aiEnabled: true,
+  updatedAt: Date.now(),
+};
+
+// Periodic background profile refresher
+async function refreshProfileCache() {
+  try {
+    const p = await getAgentProfile();
+    if (p) cachedAgentProfile = p;
+  } catch {}
+}
+setInterval(refreshProfileCache, 30000);
+refreshProfileCache();
+
 async function startWhatsAppGateway() {
   console.log('\n======================================================');
-  console.log('🤖 LEADPILOT AI - NATIVE WHATSAPP GATEWAY (BAILEYS)');
+  console.log('⚡ LEADPILOT AI - ULTRA HIGH SPEED WHATSAPP GATEWAY');
   console.log('======================================================\n');
 
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
@@ -39,7 +63,7 @@ async function startWhatsAppGateway() {
     connectTimeoutMs: 60000,
     keepAliveIntervalMs: 25000,
     defaultQueryTimeoutMs: 60000,
-    generateHighQualityLinkPreview: true,
+    generateHighQualityLinkPreview: false,
   });
 
   sock.ev.on('creds.update', saveCreds);
@@ -55,12 +79,6 @@ async function startWhatsAppGateway() {
         console.log('\n======================================================');
         console.log(`🔑 LIVE WHATSAPP PAIRING CODE:  ${pairingCode}`);
         console.log('======================================================');
-        console.log(`\n📲 INSTRUCTIONS FOR SACHIN SIR (+${cleanPhone}):`);
-        console.log('1. Open WhatsApp on phone.');
-        console.log('2. Tap Settings (or 3 dots) ➔ "Linked Devices"');
-        console.log('3. Tap "Link a Device" ➔ "Link with phone number instead"');
-        console.log(`4. Enter this code: 👉  ${pairingCode}`);
-        console.log('======================================================\n');
       } catch (err) {
         console.error('Error requesting pairing code:', err);
       }
@@ -74,7 +92,6 @@ async function startWhatsAppGateway() {
       try {
         const qrPath = path.resolve(__dirname, '../public/whatsapp-qr.png');
         await QRCode.toFile(qrPath, qr, { width: 400, margin: 2 });
-        console.log(`📸 High-res QR code image saved to: ${qrPath}`);
       } catch (e) {}
     }
 
@@ -98,7 +115,6 @@ async function startWhatsAppGateway() {
 
     for (const msg of messages) {
       if (!msg.message) continue;
-      if (msg.key.fromMe) continue; // Ignore messages sent by bot
 
       const remoteJid = msg.key.remoteJid;
       if (!remoteJid || remoteJid.endsWith('@g.us')) continue; // Ignore group messages
@@ -113,29 +129,50 @@ async function startWhatsAppGateway() {
 
       if (!messageText.trim()) continue;
 
+      // Detect human manual reply from Sachin Sir's phone
+      if (msg.key.fromMe) {
+        console.log(`👤 Human Agent replied to ${rawPhone}: "${messageText}". Pausing AI.`);
+        const cachedLead = leadsCache.get(rawPhone);
+        if (cachedLead) {
+          cachedLead.aiStatus = 'agent_took_over';
+          updateLead(cachedLead.id, { aiStatus: 'agent_took_over' }).catch(() => {});
+        }
+        continue;
+      }
+
       console.log(`\n📩 Inbound WhatsApp from ${pushName} (+${rawPhone}): "${messageText}"`);
 
-      // 1. Send "Typing..." presence immediately for realistic human interaction
+      // 1. Send "Typing..." presence immediately for natural feel
       sock.sendPresenceUpdate('composing', remoteJid).catch(() => {});
 
-      try {
-        // 2. Find or create lead in parallel
-        const [leadRes, agentProfile] = await Promise.all([
-          getLeadByPhone(rawPhone),
-          getAgentProfile()
-        ]);
+      const startTime = Date.now();
 
-        let lead = leadRes;
+      try {
+        // 2. Check Master AI Killswitch in memory
+        if (cachedAgentProfile.aiEnabled === false) {
+          console.log('🛑 Master AI Killswitch is active. Skipping auto-reply.');
+          sock.sendPresenceUpdate('paused', remoteJid).catch(() => {});
+          continue;
+        }
+
+        // 3. Fast In-Memory Lead & History retrieval (0ms)
+        let lead = leadsCache.get(rawPhone);
         if (!lead) {
-          lead = await createLead({
+          lead = {
+            id: `lead-${Date.now()}`,
             name: pushName,
             phone: `+${rawPhone}`,
             source: 'whatsapp_inbound',
             status: 'new',
             aiStatus: 'ai_handling',
             consentStatus: 'opted_in',
-          });
-          console.log(`✨ Created new lead in LeadPilot CRM: ${lead.name} (${lead.phone})`);
+            createdAt: Date.now(),
+          };
+          leadsCache.set(rawPhone, lead);
+          // Async save to Firestore in background
+          createLead(lead).then(created => {
+            if (created) leadsCache.set(rawPhone, created);
+          }).catch(() => {});
         }
 
         if (lead.aiStatus === 'agent_took_over') {
@@ -144,84 +181,73 @@ async function startWhatsAppGateway() {
           continue;
         }
 
-        if (agentProfile.aiEnabled === false) {
-          console.log('🛑 Master AI Killswitch is active. Skipping auto-reply.');
-          sock.sendPresenceUpdate('paused', remoteJid).catch(() => {});
-          continue;
-        }
+        let history = recentMessagesCache.get(rawPhone) || [];
 
-        // 3. Conversation history & Property matches in parallel
-        const [history, matchingProperties] = await Promise.all([
-          getConversation(lead.id),
-          (lead.budget && (lead.locality || lead.propertyType))
-            ? findMatchingProperties(lead.budget, lead.locality || null, lead.propertyType || null)
-            : Promise.resolve([])
-        ]);
-
-        // Save incoming message in background
-        saveMessage(lead.id, {
-          leadId: lead.id,
-          role: 'lead',
-          content: messageText,
-          timestamp: Date.now(),
-        }).catch(() => {});
-
-        // 4. Generate AI Response via Groq (Llama 3.3 70B - Lightning Fast)
-        console.log(`🧠 Generating AI response for ${pushName}...`);
+        // 4. Generate AI Response via Groq (Llama 3.1 8B Instant - ~200ms)
         const { message: aiResponse, needsAgent, extractedInfo } = await generateAIResponse(
           lead,
           history,
           messageText,
-          agentProfile,
-          matchingProperties
+          cachedAgentProfile,
+          []
         );
 
-        // 5. Send AI Reply over WhatsApp IMMEDIATELY
+        // 5. Send AI Reply over WhatsApp Socket IMMEDIATELY!
         await sock.sendMessage(remoteJid, { text: aiResponse });
         sock.sendPresenceUpdate('paused', remoteJid).catch(() => {});
-        console.log(`🤖 Sent AI reply to ${pushName}: "${aiResponse}"`);
+        
+        const duration = Date.now() - startTime;
+        console.log(`⚡ Sent AI reply to ${pushName} in ${duration}ms: "${aiResponse}"`);
 
-        // 6. Save AI reply & background CRM updates asynchronously
-        saveMessage(lead.id, {
-          leadId: lead.id,
-          role: 'ai',
-          content: aiResponse,
-          timestamp: Date.now(),
-        }).catch(() => {});
+        // 6. Update in-memory message history
+        const leadMsg: Message = { id: `m-${Date.now()}-1`, leadId: lead.id, role: 'lead', content: messageText, timestamp: Date.now() };
+        const aiMsg: Message = { id: `m-${Date.now()}-2`, leadId: lead.id, role: 'ai', content: aiResponse, timestamp: Date.now() };
+        history.push(leadMsg, aiMsg);
+        if (history.length > 10) history = history.slice(-10);
+        recentMessagesCache.set(rawPhone, history);
 
-        const updates: any = {};
-        let shouldUpdate = false;
-        if (needsAgent && lead.aiStatus !== 'needs_agent') {
-          updates.aiStatus = 'needs_agent';
-          updates.status = 'qualified';
-          shouldUpdate = true;
-        }
-        if (extractedInfo.budget && !lead.budget) { updates.budget = extractedInfo.budget; shouldUpdate = true; }
-        if (extractedInfo.locality && !lead.locality) { updates.locality = extractedInfo.locality; shouldUpdate = true; }
-        if (extractedInfo.propertyType && !lead.propertyType) { updates.propertyType = extractedInfo.propertyType; shouldUpdate = true; }
-        if (extractedInfo.aiSummary) { updates.aiSummary = extractedInfo.aiSummary; shouldUpdate = true; }
-        if (extractedInfo.leadScore) { updates.leadScore = extractedInfo.leadScore; shouldUpdate = true; }
+        // 7. Non-blocking background Firestore sync
+        setTimeout(async () => {
+          try {
+            saveMessage(lead.id, leadMsg).catch(() => {});
+            saveMessage(lead.id, aiMsg).catch(() => {});
 
-        if (shouldUpdate) {
-          updateLead(lead.id, updates).catch(() => {});
-        }
+            const updates: any = {};
+            let shouldUpdate = false;
+            if (needsAgent && lead.aiStatus !== 'needs_agent') {
+              updates.aiStatus = 'needs_agent';
+              updates.status = 'qualified';
+              lead.aiStatus = 'needs_agent';
+              shouldUpdate = true;
+            }
+            if (extractedInfo.budget && !lead.budget) { updates.budget = extractedInfo.budget; lead.budget = extractedInfo.budget; shouldUpdate = true; }
+            if (extractedInfo.locality && !lead.locality) { updates.locality = extractedInfo.locality; lead.locality = extractedInfo.locality; shouldUpdate = true; }
+            if (extractedInfo.propertyType && !lead.propertyType) { updates.propertyType = extractedInfo.propertyType; lead.propertyType = extractedInfo.propertyType; shouldUpdate = true; }
+            if (extractedInfo.aiSummary) { updates.aiSummary = extractedInfo.aiSummary; shouldUpdate = true; }
+            if (extractedInfo.leadScore) { updates.leadScore = extractedInfo.leadScore; shouldUpdate = true; }
 
-        if (extractedInfo.actionItems && Array.isArray(extractedInfo.actionItems)) {
-          for (const taskText of extractedInfo.actionItems) {
-            createTask({ leadId: lead.id, leadName: lead.name, task: taskText, status: 'Pending' }).catch(() => {});
-          }
-        }
+            if (shouldUpdate) {
+              updateLead(lead.id, updates).catch(() => {});
+            }
 
-        if (extractedInfo.siteVisits && Array.isArray(extractedInfo.siteVisits)) {
-          for (const visitDateStr of extractedInfo.siteVisits) {
-            let ts = Date.now() + 86400000;
-            try {
-              const p = new Date(visitDateStr).getTime();
-              if (!isNaN(p)) ts = p;
-            } catch(e) {}
-            createVisit({ leadId: lead.id, leadName: lead.name, scheduledAt: ts, status: 'Upcoming' }).catch(() => {});
-          }
-        }
+            if (extractedInfo.actionItems && Array.isArray(extractedInfo.actionItems)) {
+              for (const taskText of extractedInfo.actionItems) {
+                createTask({ leadId: lead.id, leadName: lead.name, task: taskText, status: 'Pending' }).catch(() => {});
+              }
+            }
+
+            if (extractedInfo.siteVisits && Array.isArray(extractedInfo.siteVisits)) {
+              for (const visitDateStr of extractedInfo.siteVisits) {
+                let ts = Date.now() + 86400000;
+                try {
+                  const p = new Date(visitDateStr).getTime();
+                  if (!isNaN(p)) ts = p;
+                } catch(e) {}
+                createVisit({ leadId: lead.id, leadName: lead.name, scheduledAt: ts, status: 'Upcoming' }).catch(() => {});
+              }
+            }
+          } catch (e) {}
+        }, 10);
 
       } catch (err) {
         console.error(`Error processing message from ${rawPhone}:`, err);
