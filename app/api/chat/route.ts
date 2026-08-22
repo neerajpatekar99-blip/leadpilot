@@ -21,7 +21,16 @@ export async function POST(request: Request) {
     }
 
     if (lead.aiStatus === 'agent_took_over') {
-      return NextResponse.json({ error: 'agent handling' }, { status: 400 });
+      return NextResponse.json({ error: 'agent handling', stopped: true }, { status: 400 });
+    }
+
+    // Fetch dynamic agent profile & check Master AI Killswitch
+    const agentProfile = await getAgentProfile();
+    if (agentProfile.aiEnabled === false) {
+      return NextResponse.json({ 
+        error: 'AI operations are currently stopped by agent in manual mode.', 
+        stopped: true 
+      }, { status: 403 });
     }
 
     // Fetch conversation history BEFORE adding the new message
@@ -34,9 +43,6 @@ export async function POST(request: Request) {
       content: message,
       timestamp: Date.now(),
     });
-
-    // Fetch dynamic agent profile & custom instructions
-    const agentProfile = await getAgentProfile();
 
     // Find matching properties if we have enough lead context
     let matchingProperties: any[] = [];

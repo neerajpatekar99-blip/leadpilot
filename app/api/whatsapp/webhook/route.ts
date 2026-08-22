@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getLeadByPhone, createLead, saveMessage } from '@/lib/firestore/leads';
+import { getAgentProfile } from '@/lib/firestore/agent';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -47,7 +48,12 @@ export async function POST(request: Request) {
           });
         }
 
-        if (lead.aiStatus === 'agent_took_over') {
+        // Fetch Agent Profile to check Master AI Killswitch
+        const agentProfile = await getAgentProfile();
+        const isAiPausedGlobally = agentProfile.aiEnabled === false;
+
+        if (isAiPausedGlobally || lead.aiStatus === 'agent_took_over') {
+          // Master AI is Stopped or Agent Took Over: Record message only, do NOT auto-reply
           await saveMessage(lead.id, {
             leadId: lead.id,
             role: 'lead',

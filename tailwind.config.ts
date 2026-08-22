@@ -22,8 +22,7 @@ const config: Config = {
         }
       },
       fontFamily: {
-        sans: ['"Cormorant Garamond"', 'serif'],
-        serif: ['"Cormorant Garamond"', 'serif'],
+        sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'],
       }
     },
   },

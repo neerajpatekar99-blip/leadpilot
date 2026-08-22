@@ -188,6 +188,36 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
         {/* TAB 1: AI CUSTOM PROMPTS & PERSONA */}
         {activeTab === 'ai' && (
           <form onSubmit={handleSaveProfile} className="space-y-4 animate-in fade-in duration-300">
+            {/* Master AI Killswitch Banner */}
+            <div className={`p-3.5 rounded-xl border flex items-center justify-between transition-all ${
+              profile.aiEnabled !== false
+                ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+                : 'bg-rose-950/40 border-rose-500/40 text-rose-300'
+            }`}>
+              <div>
+                <h4 className="text-xs font-bold flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${profile.aiEnabled !== false ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`} />
+                  Master AI Operations Switch: {profile.aiEnabled !== false ? 'ACTIVE (24/7 Autopilot)' : 'PAUSED (Manual Mode)'}
+                </h4>
+                <p className="text-[11px] text-claude-muted mt-0.5">
+                  {profile.aiEnabled !== false
+                    ? 'AI is actively qualifying leads and negotiating on WhatsApp.'
+                    : 'All AI responses are halted. Leads are held for manual agent replies.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setProfile({ ...profile, aiEnabled: profile.aiEnabled === false })}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                  profile.aiEnabled !== false
+                    ? 'bg-rose-600/80 hover:bg-rose-600 text-white border-rose-500 shadow-sm'
+                    : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 border-emerald-400 shadow-sm'
+                }`}
+              >
+                {profile.aiEnabled !== false ? '🛑 Stop AI Operations' : '▶️ Resume AI Operations'}
+              </button>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted mb-1">Agent Name</label>
@@ -195,7 +225,7 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
                   value={profile.name || ''} 
                   onChange={e => setProfile({ ...profile, name: e.target.value })}
                   className="w-full bg-claude-bg border border-claude-border rounded-lg px-3 py-2 text-xs text-claude-text focus:outline-none focus:ring-1 focus:ring-claude-accent" 
-                  placeholder="Rahul Sharma"
+                  placeholder="Sachin Bhoir"
                 />
               </div>
 
@@ -205,7 +235,7 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
                   value={profile.agencyName || ''} 
                   onChange={e => setProfile({ ...profile, agencyName: e.target.value })}
                   className="w-full bg-claude-bg border border-claude-border rounded-lg px-3 py-2 text-xs text-claude-text focus:outline-none focus:ring-1 focus:ring-claude-accent" 
-                  placeholder="LeadPilot Prime Realty"
+                  placeholder="One Stop Property Solutions"
                 />
               </div>
 

@@ -78,5 +78,6 @@ export interface AgentProfile {
   customInstructions?: string;
   tone?: 'friendly' | 'professional' | 'luxury' | 'casual' | 'custom';
   languagePreference?: 'hinglish' | 'english' | 'hindi' | 'auto';
+  aiEnabled?: boolean;
   updatedAt?: number;
 }

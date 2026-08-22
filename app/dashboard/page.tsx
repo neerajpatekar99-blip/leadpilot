@@ -12,6 +12,7 @@ import { TasksWidget } from '@/components/dashboard/TasksWidget';
 import { VisitsWidget } from '@/components/dashboard/VisitsWidget';
 import { Modal } from '@/components/ui/Modal';
 import { Lead } from '@/lib/types';
+import AiKillswitchButton from '@/components/ui/AiKillswitchButton';
 import Link from 'next/link';
 import { PlusIcon, Cog6ToothIcon, MagnifyingGlassIcon, UsersIcon, ExclamationCircleIcon, CheckCircleIcon, Squares2X2Icon, ListBulletIcon, LightBulbIcon, ArrowPathIcon, XMarkIcon, BuildingOffice2Icon, ChatBubbleOvalLeftIcon } from '@heroicons/react/24/outline';
 
@@ -138,7 +139,7 @@ export default function DashboardPage() {
         {/* Top Navigation */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex items-center gap-6">
-            <h1 className="text-3xl font-bold font-serif">LeadPilot CRM</h1>
+            <h1 className="text-3xl font-extrabold tracking-tight">LeadPilot CRM</h1>
             <div className="hidden md:flex bg-claude-card border border-claude-border rounded-lg p-1">
               <button 
                 className="flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-colors bg-claude-bg text-claude-text shadow-sm"
@@ -155,6 +156,7 @@ export default function DashboardPage() {
           </div>
           
           <div className="flex w-full md:w-auto items-center gap-3">
+            <AiKillswitchButton />
             <button 
               onClick={() => setIsSettingsModalOpen(true)}
               className="p-2.5 bg-claude-card border border-claude-border text-claude-muted hover:text-claude-text rounded-lg shadow-sm transition-colors"

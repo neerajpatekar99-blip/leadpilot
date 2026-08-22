@@ -13,6 +13,7 @@ import {
 import PropertyTable from '@/components/properties/PropertyTable';
 import PropertyForm from '@/components/properties/PropertyForm';
 import { SettingsModal } from '@/components/leads/SettingsModal';
+import AiKillswitchButton from '@/components/ui/AiKillswitchButton';
 import { Property } from '@/lib/types';
 
 export default function PropertiesPage() {
@@ -56,7 +57,7 @@ export default function PropertiesPage() {
         {/* Top Header & Navigation */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex items-center gap-6">
-            <h1 className="text-3xl font-bold font-serif">LeadPilot CRM</h1>
+            <h1 className="text-3xl font-extrabold tracking-tight">LeadPilot CRM</h1>
             <div className="hidden md:flex bg-claude-card border border-claude-border rounded-lg p-1">
               <Link 
                 href="/dashboard"
@@ -73,6 +74,7 @@ export default function PropertiesPage() {
           </div>
           
           <div className="flex w-full md:w-auto items-center gap-3">
+            <AiKillswitchButton />
             <button 
               onClick={() => setShowSettings(true)}
               className="p-2.5 bg-claude-card border border-claude-border text-claude-muted hover:text-claude-text rounded-lg shadow-sm transition-colors"
@@ -108,7 +110,7 @@ export default function PropertiesPage() {
         {/* Page Title & Fast Add Promo Banner */}
         <div className="bg-gradient-to-r from-claude-card via-claude-card to-[#1d1614] border border-claude-border p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm">
           <div>
-            <h2 className="text-2xl font-serif text-white">Property Inventory & Catalog</h2>
+            <h2 className="text-2xl font-bold text-white tracking-tight">Property Inventory & Catalog</h2>
             <p className="text-sm text-claude-muted mt-1">
               Properties listed here are dynamically matched and pitched to high-intent leads by the AI assistant.
             </p>
@@ -174,7 +176,7 @@ export default function PropertiesPage() {
             <div className="bg-claude-card border border-claude-border rounded-2xl w-full max-w-3xl max-h-[92vh] overflow-y-auto shadow-2xl">
               <div className="sticky top-0 bg-claude-card/95 backdrop-blur z-10 px-6 py-4 border-b border-claude-border flex justify-between items-center">
                 <div>
-                  <h2 className="text-xl font-medium text-white font-serif">Add Property to Catalog</h2>
+                  <h2 className="text-xl font-bold text-white tracking-tight">Add Property to Catalog</h2>
                   <p className="text-xs text-claude-muted">Use AI fast import or fill details manually</p>
                 </div>
                 <button onClick={() => setShowModal(false)} className="text-claude-muted hover:text-white p-1 text-lg">

@@ -30,7 +30,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
       ></div>
       <div className="relative bg-claude-card rounded-xl shadow-xl border border-claude-border w-full max-w-lg mx-auto transform transition-all">
         <div className="flex items-center justify-between p-5 border-b border-claude-border">
-          <h2 className="text-lg font-semibold font-serif text-claude-text">{title}</h2>
+          <h2 className="text-lg font-bold text-claude-text">{title}</h2>
           <button 
             onClick={onClose}
             className="text-claude-muted hover:text-claude-text transition-colors rounded-full p-1 hover:bg-gray-100"

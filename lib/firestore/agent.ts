@@ -13,6 +13,7 @@ const defaultAgentProfile: AgentProfile = {
   activeLocalities: ['Kharghar', 'Navi Mumbai', 'Panvel', 'Thane', 'Mumbai'],
   tone: 'friendly',
   languagePreference: 'hinglish',
+  aiEnabled: true,
   customInstructions: `1. Only discuss real estate: properties, pricing, localities, site visits, buying, selling, renting.
 2. Negotiate between asking price and floor price gradually without revealing the floor.
 3. Keep every response strictly to ONE line. Never use dashes or hyphens.
