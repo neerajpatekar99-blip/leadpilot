@@ -3,28 +3,9 @@ import { ActionItem } from '../types';
 
 const TASKS_COLLECTION = 'tasks';
 
-const initialSeedTasks: ActionItem[] = [
-  {
-    id: 'task-1',
-    leadId: 'lead-1',
-    leadName: 'Ananya Deshmukh',
-    task: 'Confirm Sunday 11 AM site visit for Prestige Lakeside Habitat',
-    dueDate: Date.now() + 86400000,
-    status: 'Pending',
-    createdAt: Date.now() - 3600000,
-  },
-  {
-    id: 'task-2',
-    leadId: 'lead-3',
-    leadName: 'Rohan Mehta',
-    task: 'Send bespoke brochure & floor plans for Lodha Sea View 4BHK',
-    dueDate: Date.now() + 3600000 * 5,
-    status: 'Pending',
-    createdAt: Date.now() - 7200000,
-  }
-];
+const initialSeedTasks: ActionItem[] = [];
 
-let memoryTasks: ActionItem[] = [...initialSeedTasks];
+let memoryTasks: ActionItem[] = [];
 
 export async function createTask(data: Partial<ActionItem>): Promise<ActionItem> {
   const task: ActionItem = {

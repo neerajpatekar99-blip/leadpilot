@@ -3,21 +3,9 @@ import { SiteVisit } from '../types';
 
 const VISITS_COLLECTION = 'visits';
 
-const initialSeedVisits: SiteVisit[] = [
-  {
-    id: 'visit-1',
-    leadId: 'lead-1',
-    leadName: 'Ananya Deshmukh',
-    propertyId: 'prop-1',
-    propertyTitle: 'Prestige Lakeside Habitat 3BHK',
-    scheduledAt: Date.now() + 86400000 * 2, // Sunday
-    status: 'Upcoming',
-    notes: 'Requested high floor unit facing the clubhouse.',
-    createdAt: Date.now() - 3600000,
-  }
-];
+const initialSeedVisits: SiteVisit[] = [];
 
-let memoryVisits: SiteVisit[] = [...initialSeedVisits];
+let memoryVisits: SiteVisit[] = [];
 
 export async function createVisit(data: Partial<SiteVisit>): Promise<SiteVisit> {
   const visit: SiteVisit = {

@@ -43,9 +43,6 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const [isLaunchingMeta, setIsLaunchingMeta] = useState(false);
   const [metaAuthStatus, setMetaAuthStatus] = useState<string | null>(null);
 
-  const [isBackingUp, setIsBackingUp] = useState(false);
-  const [backupResult, setBackupResult] = useState<{ url: string; count: number } | null>(null);
-
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -71,22 +68,6 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
     : 'https://leadpilot-liard.vercel.app/api/whatsapp/webhook';
 
   const verifyToken = 'leadpilot_webhook_token';
-
-  const triggerGcsBackup = async () => {
-    setIsBackingUp(true);
-    setBackupResult(null);
-    try {
-      const res = await fetch('/api/storage/backup', { method: 'POST' });
-      const data = await res.json();
-      if (data.success) {
-        setBackupResult({ url: data.backupUrl, count: data.leadCount });
-      }
-    } catch (err) {
-      console.error('Backup failed:', err);
-    } finally {
-      setIsBackingUp(false);
-    }
-  };
 
   const launchMetaEmbeddedSignup = () => {
     setIsLaunchingMeta(true);
@@ -252,18 +233,6 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
           </button>
 
           <button
-            onClick={() => setActiveTab('integrations')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              activeTab === 'integrations' 
-                ? 'bg-claude-accent text-white shadow-sm' 
-                : 'text-claude-muted hover:text-white'
-            }`}
-          >
-            <GlobeAltIcon className="w-4 h-4" />
-            <span>📱 WhatsApp & Webhooks</span>
-          </button>
-
-          <button
             onClick={() => setActiveTab('health')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
               activeTab === 'health' 
@@ -271,8 +240,8 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
                 : 'text-claude-muted hover:text-white'
             }`}
           >
-            <CommandLineIcon className="w-4 h-4" />
-            <span>⚡ System Health</span>
+            <SparklesIcon className="w-4 h-4" />
+            <span>⚡ System Diagnostics</span>
           </button>
         </div>
 
@@ -414,147 +383,6 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
           </form>
         )}
 
-        {/* TAB 2: INTEGRATIONS & WEBHOOKS */}
-        {activeTab === 'integrations' && (
-          <div className="space-y-4 animate-in fade-in duration-300">
-            {/* Meta 1-Click Embedded Onboarding */}
-            <div className="bg-gradient-to-r from-emerald-950/40 via-claude-card to-[#121f18] p-4 rounded-xl border border-emerald-500/30">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <h3 className="text-sm font-bold text-white">Meta WhatsApp Business Coexistence Onboarding</h3>
-                </div>
-                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30 font-mono">
-                  Config ID: 1930273901003382
-                </span>
-              </div>
-              <p className="text-xs text-claude-muted mb-3 leading-relaxed">
-                Connect your existing WhatsApp Business number directly through Meta&apos;s official popup with chat history and phone coexistence.
-              </p>
-              
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={launchMetaEmbeddedSignup}
-                  disabled={isLaunchingMeta}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold flex items-center gap-2 shadow-lg shadow-emerald-900/30 transition-all disabled:opacity-50"
-                >
-                  {isLaunchingMeta ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <span>🔗</span>}
-                  <span>{isLaunchingMeta ? 'Launching Meta Popup...' : 'Connect WhatsApp Business via Meta'}</span>
-                </button>
-                {metaAuthStatus && (
-                  <span className="text-xs font-medium text-emerald-400">{metaAuthStatus}</span>
-                )}
-              </div>
-            </div>
-
-            {/* WhatsApp Cloud API Webhook */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted">
-                  WhatsApp Cloud API Webhook (Inbound Messages)
-                </label>
-                <span className="text-[10px] text-emerald-400 font-mono">Status: Connected & Verified</span>
-              </div>
-              <div className="flex">
-                <input 
-                  type="text" 
-                  readOnly 
-                  value={waWebhookUrl}
-                  className="flex-1 bg-claude-bg border border-claude-border rounded-l-lg px-3 py-2 text-xs text-claude-text focus:outline-none font-mono"
-                />
-                <button 
-                  onClick={() => copyToClipboard(waWebhookUrl, false)}
-                  className="bg-claude-card hover:bg-white/10 border border-l-0 border-claude-border rounded-r-lg px-3.5 flex items-center justify-center transition-colors"
-                >
-                  {copiedWaUrl ? <CheckIcon className="w-4 h-4 text-green-400" /> : <DocumentDuplicateIcon className="w-4 h-4 text-claude-muted" />}
-                </button>
-              </div>
-            </div>
-
-            {/* Facebook Lead Ads Webhook */}
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted mb-1">
-                Facebook Lead Ads Webhook (Instant Ad Form Sync)
-              </label>
-              <div className="flex">
-                <input 
-                  type="text" 
-                  readOnly 
-                  value={webhookUrl}
-                  className="flex-1 bg-claude-bg border border-claude-border rounded-l-lg px-3 py-2 text-xs text-claude-text focus:outline-none font-mono"
-                />
-                <button 
-                  onClick={() => copyToClipboard(webhookUrl, false)}
-                  className="bg-claude-card hover:bg-white/10 border border-l-0 border-claude-border rounded-r-lg px-3.5 flex items-center justify-center transition-colors"
-                >
-                  {copiedUrl ? <CheckIcon className="w-4 h-4 text-green-400" /> : <DocumentDuplicateIcon className="w-4 h-4 text-claude-muted" />}
-                </button>
-              </div>
-            </div>
-
-            {/* Verify Token */}
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted mb-1">Verify Token (Meta Challenge)</label>
-              <div className="flex">
-                <input 
-                  type="text" 
-                  readOnly 
-                  value={verifyToken}
-                  className="flex-1 bg-claude-bg border border-claude-border rounded-l-lg px-3 py-2 text-xs text-claude-text focus:outline-none font-mono"
-                />
-                <button 
-                  onClick={() => copyToClipboard(verifyToken, true)}
-                  className="bg-claude-card hover:bg-white/10 border border-l-0 border-claude-border rounded-r-lg px-3.5 flex items-center justify-center transition-colors"
-                >
-                  {copiedToken ? <CheckIcon className="w-4 h-4 text-green-400" /> : <DocumentDuplicateIcon className="w-4 h-4 text-claude-muted" />}
-                </button>
-              </div>
-            </div>
-
-            <div className="bg-claude-bg p-3.5 rounded-xl border border-claude-border">
-              <h4 className="text-xs font-semibold mb-2 text-claude-text">Active Connected Phone Asset:</h4>
-              <div className="text-xs text-claude-muted space-y-1 font-mono">
-                <div>• Verified Name: <span className="text-white font-medium">One Stop Property Solution</span></div>
-                <div>• Verified Phone: <span className="text-emerald-400 font-medium">+91 80970 63232</span></div>
-                <div>• Phone Number ID: <span className="text-white font-medium">532941163244534</span></div>
-              </div>
-            </div>
-
-            {/* Google Cloud Storage Integration */}
-            <div className="bg-gradient-to-r from-blue-950/30 via-claude-card to-[#0d1b2a] p-4 rounded-xl border border-blue-500/30">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-blue-400" />
-                  <h4 className="text-xs font-bold text-white">Google Cloud Storage (GCS)</h4>
-                </div>
-                <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full border border-blue-500/30 font-mono">
-                  Bucket: leadpilot75.appspot.com
-                </span>
-              </div>
-              <p className="text-xs text-claude-muted mb-3 leading-relaxed">
-                Stores HD property brochures, floor plans, and generates automatic daily CSV archives of your leads and conversations.
-              </p>
-              
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={triggerGcsBackup}
-                  disabled={isBackingUp}
-                  className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold flex items-center gap-2 shadow-md shadow-blue-900/30 transition-all disabled:opacity-50"
-                >
-                  {isBackingUp ? <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" /> : <span>☁️</span>}
-                  <span>{isBackingUp ? 'Exporting to GCS...' : 'Export & Backup Leads to GCS'}</span>
-                </button>
-                {backupResult && (
-                  <span className="text-xs font-medium text-blue-400">
-                    ✅ Backed up {backupResult.count} leads to Google Cloud!
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* TAB 3: SYSTEM HEALTH & DIAGNOSTICS */}
         {activeTab === 'health' && (
