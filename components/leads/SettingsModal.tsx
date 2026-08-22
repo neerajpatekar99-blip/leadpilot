@@ -43,6 +43,9 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const [isLaunchingMeta, setIsLaunchingMeta] = useState(false);
   const [metaAuthStatus, setMetaAuthStatus] = useState<string | null>(null);
 
+  const [isBackingUp, setIsBackingUp] = useState(false);
+  const [backupResult, setBackupResult] = useState<{ url: string; count: number } | null>(null);
+
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -68,6 +71,22 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
     : 'https://leadpilot-liard.vercel.app/api/whatsapp/webhook';
 
   const verifyToken = 'leadpilot_webhook_token';
+
+  const triggerGcsBackup = async () => {
+    setIsBackingUp(true);
+    setBackupResult(null);
+    try {
+      const res = await fetch('/api/storage/backup', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        setBackupResult({ url: data.backupUrl, count: data.leadCount });
+      }
+    } catch (err) {
+      console.error('Backup failed:', err);
+    } finally {
+      setIsBackingUp(false);
+    }
+  };
 
   const launchMetaEmbeddedSignup = () => {
     setIsLaunchingMeta(true);
@@ -499,6 +518,39 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
                 <div>• Verified Name: <span className="text-white font-medium">One Stop Property Solution</span></div>
                 <div>• Verified Phone: <span className="text-emerald-400 font-medium">+91 80970 63232</span></div>
                 <div>• Phone Number ID: <span className="text-white font-medium">532941163244534</span></div>
+              </div>
+            </div>
+
+            {/* Google Cloud Storage Integration */}
+            <div className="bg-gradient-to-r from-blue-950/30 via-claude-card to-[#0d1b2a] p-4 rounded-xl border border-blue-500/30">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-400" />
+                  <h4 className="text-xs font-bold text-white">Google Cloud Storage (GCS)</h4>
+                </div>
+                <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full border border-blue-500/30 font-mono">
+                  Bucket: leadpilot75.appspot.com
+                </span>
+              </div>
+              <p className="text-xs text-claude-muted mb-3 leading-relaxed">
+                Stores HD property brochures, floor plans, and generates automatic daily CSV archives of your leads and conversations.
+              </p>
+              
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={triggerGcsBackup}
+                  disabled={isBackingUp}
+                  className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold flex items-center gap-2 shadow-md shadow-blue-900/30 transition-all disabled:opacity-50"
+                >
+                  {isBackingUp ? <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" /> : <span>☁️</span>}
+                  <span>{isBackingUp ? 'Exporting to GCS...' : 'Export & Backup Leads to GCS'}</span>
+                </button>
+                {backupResult && (
+                  <span className="text-xs font-medium text-blue-400">
+                    ✅ Backed up {backupResult.count} leads to Google Cloud!
+                  </span>
+                )}
               </div>
             </div>
           </div>

@@ -29,6 +29,7 @@ export interface Property {
   areaSqft: number;
   amenities: string[];
   imageUrls: string[];
+  brochureUrl?: string;
   status: 'available' | 'sold' | 'on_hold';
   description: string;
   builderName?: string;
