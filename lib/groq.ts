@@ -128,7 +128,9 @@ You must output a JSON object containing:
     { role: 'system', content: systemPrompt },
     ...conversationHistory.slice(-4).map(msg => ({
       role: msg.role === 'ai' ? 'assistant' : 'user',
-      content: msg.content,
+      content: msg.role === 'ai' 
+        ? (msg.content.trim().startsWith('{') ? msg.content : JSON.stringify({ message: msg.content }))
+        : msg.content,
     })),
     { role: 'user', content: newMessage }
   ];
@@ -143,7 +145,7 @@ You must output a JSON object containing:
         temperature: 0.2,
       });
     } catch (primaryErr) {
-      console.warn('Primary model error, falling back to qwen/qwen3.6-27b:', primaryErr);
+      console.warn('Primary model error, trying standard completion...', primaryErr);
       chatCompletion = await getGroqClient().chat.completions.create({
         messages,
         model: 'qwen/qwen3.6-27b',

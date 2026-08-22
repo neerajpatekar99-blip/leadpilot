@@ -267,9 +267,15 @@ async function startWhatsAppGateway() {
 
       } catch (err) {
         console.error(`Error processing message from ${rawPhone}:`, err);
+        try {
+          await sock.sendMessage(remoteJid, { 
+            text: "Got it! Which locality and budget range are you looking at so I can share the best available options?" 
+          });
+        } catch(e) {}
       }
     }
   });
 }
 
 startWhatsAppGateway().catch((err) => console.error('Fatal WhatsApp Gateway Error:', err));
+
