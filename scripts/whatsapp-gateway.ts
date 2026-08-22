@@ -6,6 +6,8 @@ import makeWASocket, {
 import pino from 'pino';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+import * as fs from 'fs';
+import QRCode from 'qrcode';
 import { getLeadByPhone, createLead, saveMessage, getConversation, updateLead } from '../lib/firestore/leads';
 import { generateAIResponse } from '../lib/groq';
 import { getAgentProfile } from '../lib/firestore/agent';
@@ -16,13 +18,14 @@ import { createVisit } from '../lib/firestore/visits';
 dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
 
 const TARGET_PHONE = process.env.WHATSAPP_LINK_PHONE || '919870178204'; // Sachin Sir's number
+const AUTH_DIR = path.resolve(__dirname, '../whatsapp_auth_info');
 
 async function startWhatsAppGateway() {
   console.log('\n======================================================');
   console.log('🤖 LEADPILOT AI - NATIVE WHATSAPP GATEWAY (BAILEYS)');
   console.log('======================================================\n');
 
-  const { state, saveCreds } = await useMultiFileAuthState(path.resolve(__dirname, '../whatsapp_auth_info'));
+  const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
   const { version, isLatest } = await fetchLatestBaileysVersion();
   console.log(`Using WhatsApp Web v${version.join('.')}, isLatest: ${isLatest}`);
 
@@ -31,45 +34,61 @@ async function startWhatsAppGateway() {
     logger: pino({ level: 'silent' }),
     printQRInTerminal: false,
     auth: state,
-    browser: ['LeadPilot AI', 'Chrome', '1.0.0'],
+    browser: ['Ubuntu', 'Chrome', '20.0.04'],
+    syncFullHistory: false,
+    connectTimeoutMs: 60000,
+    keepAliveIntervalMs: 25000,
+    defaultQueryTimeoutMs: 60000,
     generateHighQualityLinkPreview: true,
   });
 
   sock.ev.on('creds.update', saveCreds);
 
-  // If not already registered, generate a Pairing Code for Sachin Sir's phone!
+  // If not already registered, generate a Pairing Code
   if (!sock.authState.creds.registered) {
     setTimeout(async () => {
       try {
         const cleanPhone = TARGET_PHONE.replace(/[^0-9]/g, '');
-        console.log(`\n⏳ Requesting 8-Digit WhatsApp Pairing Code for +${cleanPhone}...`);
+        console.log(`\n⏳ Generating live WhatsApp Pairing Code for +${cleanPhone}...`);
         const pairingCode = await sock.requestPairingCode(cleanPhone);
         
         console.log('\n======================================================');
-        console.log(`🔑 YOUR 8-DIGIT WHATSAPP PAIRING CODE:  ${pairingCode}`);
+        console.log(`🔑 LIVE WHATSAPP PAIRING CODE:  ${pairingCode}`);
         console.log('======================================================');
         console.log(`\n📲 INSTRUCTIONS FOR SACHIN SIR (+${cleanPhone}):`);
         console.log('1. Open WhatsApp on phone.');
         console.log('2. Tap Settings (or 3 dots) ➔ "Linked Devices"');
         console.log('3. Tap "Link a Device" ➔ "Link with phone number instead"');
-        console.log(`4. Enter this 8-digit code: 👉  ${pairingCode}`);
+        console.log(`4. Enter this code: 👉  ${pairingCode}`);
         console.log('======================================================\n');
       } catch (err) {
         console.error('Error requesting pairing code:', err);
       }
-    }, 3000);
+    }, 2000);
   }
 
-  sock.ev.on('connection.update', (update) => {
-    const { connection, lastDisconnect } = update;
+  sock.ev.on('connection.update', async (update) => {
+    const { connection, lastDisconnect, qr } = update;
+
+    if (qr) {
+      try {
+        const qrPath = path.resolve(__dirname, '../public/whatsapp-qr.png');
+        await QRCode.toFile(qrPath, qr, { width: 400, margin: 2 });
+        console.log(`📸 High-res QR code image saved to: ${qrPath}`);
+      } catch (e) {}
+    }
+
     if (connection === 'close') {
-      const shouldReconnect = (lastDisconnect?.error as any)?.output?.statusCode !== DisconnectReason.loggedOut;
-      console.log('Connection closed due to', lastDisconnect?.error, ', reconnecting:', shouldReconnect);
+      const statusCode = (lastDisconnect?.error as any)?.output?.statusCode;
+      const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+      console.log(`Connection closed (status ${statusCode}), reconnecting:`, shouldReconnect);
       if (shouldReconnect) {
-        startWhatsAppGateway();
+        setTimeout(() => startWhatsAppGateway(), 3000);
       }
     } else if (connection === 'open') {
-      console.log('\n✅ WHATSAPP CONNECTED & LIVE! Sachin Sir is linked to LeadPilot AI! 🚀\n');
+      console.log('\n======================================================');
+      console.log('✅ WHATSAPP CONNECTED & LIVE! Sachin Sir is linked! 🚀');
+      console.log('======================================================\n');
     }
   });
 
@@ -82,7 +101,7 @@ async function startWhatsAppGateway() {
       if (msg.key.fromMe) continue; // Ignore messages sent by bot
 
       const remoteJid = msg.key.remoteJid;
-      if (!remoteJid || remoteJid.endsWith('@g.us')) continue; // Ignore group messages for now
+      if (!remoteJid || remoteJid.endsWith('@g.us')) continue; // Ignore group messages
 
       const rawPhone = remoteJid.replace('@s.whatsapp.net', '');
       const pushName = msg.pushName || 'Inbound Lead';
@@ -96,9 +115,17 @@ async function startWhatsAppGateway() {
 
       console.log(`\n📩 Inbound WhatsApp from ${pushName} (+${rawPhone}): "${messageText}"`);
 
+      // 1. Send "Typing..." presence immediately for realistic human interaction
+      sock.sendPresenceUpdate('composing', remoteJid).catch(() => {});
+
       try {
-        // 1. Find or create lead in LeadPilot Firestore
-        let lead = await getLeadByPhone(rawPhone);
+        // 2. Find or create lead in parallel
+        const [leadRes, agentProfile] = await Promise.all([
+          getLeadByPhone(rawPhone),
+          getAgentProfile()
+        ]);
+
+        let lead = leadRes;
         if (!lead) {
           lead = await createLead({
             name: pushName,
@@ -113,36 +140,33 @@ async function startWhatsAppGateway() {
 
         if (lead.aiStatus === 'agent_took_over') {
           console.log(`⏸️ Agent took over for ${lead.name}. Skipping auto-reply.`);
+          sock.sendPresenceUpdate('paused', remoteJid).catch(() => {});
           continue;
         }
 
-        // 2. Fetch agent profile & killswitch
-        const agentProfile = await getAgentProfile();
         if (agentProfile.aiEnabled === false) {
           console.log('🛑 Master AI Killswitch is active. Skipping auto-reply.');
+          sock.sendPresenceUpdate('paused', remoteJid).catch(() => {});
           continue;
         }
 
-        // 3. Save incoming message to Firestore history
-        await saveMessage(lead.id, {
+        // 3. Conversation history & Property matches in parallel
+        const [history, matchingProperties] = await Promise.all([
+          getConversation(lead.id),
+          (lead.budget && (lead.locality || lead.propertyType))
+            ? findMatchingProperties(lead.budget, lead.locality || null, lead.propertyType || null)
+            : Promise.resolve([])
+        ]);
+
+        // Save incoming message in background
+        saveMessage(lead.id, {
           leadId: lead.id,
           role: 'lead',
           content: messageText,
           timestamp: Date.now(),
-        });
+        }).catch(() => {});
 
-        // 4. Conversation history & Property matches
-        const history = await getConversation(lead.id);
-        let matchingProperties: any[] = [];
-        if (lead.budget && (lead.locality || lead.propertyType)) {
-          matchingProperties = await findMatchingProperties(
-            lead.budget,
-            lead.locality || null,
-            lead.propertyType || null
-          );
-        }
-
-        // 5. Generate AI Response via Groq
+        // 4. Generate AI Response via Groq (Llama 3.3 70B - Lightning Fast)
         console.log(`🧠 Generating AI response for ${pushName}...`);
         const { message: aiResponse, needsAgent, extractedInfo } = await generateAIResponse(
           lead,
@@ -152,19 +176,19 @@ async function startWhatsAppGateway() {
           matchingProperties
         );
 
-        // 6. Save AI reply to Firestore history
-        await saveMessage(lead.id, {
+        // 5. Send AI Reply over WhatsApp IMMEDIATELY
+        await sock.sendMessage(remoteJid, { text: aiResponse });
+        sock.sendPresenceUpdate('paused', remoteJid).catch(() => {});
+        console.log(`🤖 Sent AI reply to ${pushName}: "${aiResponse}"`);
+
+        // 6. Save AI reply & background CRM updates asynchronously
+        saveMessage(lead.id, {
           leadId: lead.id,
           role: 'ai',
           content: aiResponse,
           timestamp: Date.now(),
-        });
+        }).catch(() => {});
 
-        // 7. Send AI Reply over WhatsApp socket
-        await sock.sendMessage(remoteJid, { text: aiResponse });
-        console.log(`🤖 Sent AI reply to ${pushName}: "${aiResponse}"`);
-
-        // 8. Update lead qualifications
         const updates: any = {};
         let shouldUpdate = false;
         if (needsAgent && lead.aiStatus !== 'needs_agent') {
@@ -179,13 +203,12 @@ async function startWhatsAppGateway() {
         if (extractedInfo.leadScore) { updates.leadScore = extractedInfo.leadScore; shouldUpdate = true; }
 
         if (shouldUpdate) {
-          await updateLead(lead.id, updates);
+          updateLead(lead.id, updates).catch(() => {});
         }
 
-        // 9. Auto-create tasks / visits
         if (extractedInfo.actionItems && Array.isArray(extractedInfo.actionItems)) {
           for (const taskText of extractedInfo.actionItems) {
-            await createTask({ leadId: lead.id, leadName: lead.name, task: taskText, status: 'Pending' });
+            createTask({ leadId: lead.id, leadName: lead.name, task: taskText, status: 'Pending' }).catch(() => {});
           }
         }
 
@@ -196,7 +219,7 @@ async function startWhatsAppGateway() {
               const p = new Date(visitDateStr).getTime();
               if (!isNaN(p)) ts = p;
             } catch(e) {}
-            await createVisit({ leadId: lead.id, leadName: lead.name, scheduledAt: ts, status: 'Upcoming' });
+            createVisit({ leadId: lead.id, leadName: lead.name, scheduledAt: ts, status: 'Upcoming' }).catch(() => {});
           }
         }
 

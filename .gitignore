@@ -35,5 +35,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# scratch test scripts
+# scratch test scripts & auth sessions
 scratch/
+whatsapp_auth_info/
