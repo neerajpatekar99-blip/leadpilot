@@ -213,12 +213,20 @@ export function parseBudget(budgetStr: string): { min: number, max: number } {
   }
 }
 
+let cachedAvailableProperties: Property[] = [];
+let lastPropsCacheTime = 0;
+
 export async function findMatchingProperties(
   budgetStr: string | null, 
   locality: string | null, 
   propertyType: string | null
 ): Promise<Property[]> {
-  const allProperties = await getProperties({ status: 'available' });
+  const now = Date.now();
+  if (now - lastPropsCacheTime > 60000 || cachedAvailableProperties.length === 0) {
+    cachedAvailableProperties = await getProperties({ status: 'available' });
+    lastPropsCacheTime = now;
+  }
+  const allProperties = cachedAvailableProperties;
   const budgetRange = budgetStr ? parseBudget(budgetStr) : { min: 0, max: Infinity };
   
   const matches = allProperties.filter(p => {

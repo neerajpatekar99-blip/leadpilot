@@ -126,7 +126,7 @@ You must output a JSON object containing:
 
   const messages: any[] = [
     { role: 'system', content: systemPrompt },
-    ...conversationHistory.map(msg => ({
+    ...conversationHistory.slice(-4).map(msg => ({
       role: msg.role === 'ai' ? 'assistant' : 'user',
       content: msg.content,
     })),
