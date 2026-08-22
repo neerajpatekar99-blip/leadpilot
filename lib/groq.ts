@@ -138,19 +138,17 @@ You must output a JSON object containing:
     try {
       chatCompletion = await getGroqClient().chat.completions.create({
         messages,
-        model: 'llama-3.1-8b-instant',
+        model: 'openai/gpt-oss-20b',
         response_format: { type: 'json_object' },
         temperature: 0.2,
-        max_tokens: 350,
       });
     } catch (primaryErr) {
-      console.warn('Primary model error, falling back to llama-3.3-70b-versatile:', primaryErr);
+      console.warn('Primary model error, falling back to qwen/qwen3.6-27b:', primaryErr);
       chatCompletion = await getGroqClient().chat.completions.create({
         messages,
-        model: 'llama-3.3-70b-versatile',
+        model: 'qwen/qwen3.6-27b',
         response_format: { type: 'json_object' },
         temperature: 0.2,
-        max_tokens: 350,
       });
     }
 
