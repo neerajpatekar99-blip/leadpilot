@@ -19,58 +19,65 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    if (body.object !== 'whatsapp_business_account') {
-      return NextResponse.json({ error: 'Invalid object' }, { status: 404 });
+    let phone: string | null = null;
+    let text: string | null = null;
+    let senderName: string = 'Inbound Lead';
+
+    // 1. Check Standard Meta Cloud API payload
+    if (body.object === 'whatsapp_business_account') {
+      const entry = body.entry?.[0];
+      const changes = entry?.changes?.[0];
+      const value = changes?.value;
+      const messages = value?.messages;
+
+      if (messages && messages.length > 0) {
+        const message = messages[0];
+        phone = message.from;
+        text = message.text?.body;
+        const contact = value.contacts?.[0];
+        senderName = contact?.profile?.name || phone;
+      }
+    } 
+    // 2. Check AiSensy / BSP payload format
+    else if (body.from || body.phone || body.data?.from || body.message || body.data?.message) {
+      phone = body.from || body.phone || body.data?.from || body.data?.phone;
+      text = typeof body.message === 'string' ? body.message : (body.message?.text || body.data?.message || body.data?.text);
+      senderName = body.name || body.data?.name || body.userName || phone;
     }
 
-    const entry = body.entry?.[0];
-    const changes = entry?.changes?.[0];
-    const value = changes?.value;
-    const messages = value?.messages;
+    if (phone && text) {
+      let lead = await getLeadByPhone(phone);
+      
+      if (!lead) {
+        lead = await createLead({
+          name: senderName,
+          phone,
+          source: 'whatsapp_inbound',
+          consentStatus: 'opted_in',
+        });
+      }
 
-    if (messages && messages.length > 0) {
-      const message = messages[0];
-      const phone = message.from; // WhatsApp returns number with country code
-      const text = message.text?.body;
+      // Fetch Agent Profile to check Master AI Killswitch
+      const agentProfile = await getAgentProfile();
+      const isAiPausedGlobally = agentProfile.aiEnabled === false;
 
-      if (text) {
-        let lead = await getLeadByPhone(phone);
+      if (isAiPausedGlobally || lead.aiStatus === 'agent_took_over') {
+        // Master AI is Stopped or Agent Took Over: Record message only, do NOT auto-reply
+        await saveMessage(lead.id, {
+          leadId: lead.id,
+          role: 'lead',
+          content: text,
+          timestamp: Date.now(),
+        });
+      } else {
+        // Forward to our chat API internally
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
         
-        if (!lead) {
-          const contact = value.contacts?.[0];
-          const name = contact?.profile?.name || phone;
-          
-          lead = await createLead({
-            name,
-            phone,
-            source: 'whatsapp_inbound',
-            consentStatus: 'opted_in',
-          });
-        }
-
-        // Fetch Agent Profile to check Master AI Killswitch
-        const agentProfile = await getAgentProfile();
-        const isAiPausedGlobally = agentProfile.aiEnabled === false;
-
-        if (isAiPausedGlobally || lead.aiStatus === 'agent_took_over') {
-          // Master AI is Stopped or Agent Took Over: Record message only, do NOT auto-reply
-          await saveMessage(lead.id, {
-            leadId: lead.id,
-            role: 'lead',
-            content: text,
-            timestamp: Date.now(),
-          });
-        } else {
-          // Forward to our chat API internally
-          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-          
-          // Use absolute URL to call our own API
-          await fetch(`${baseUrl}/api/chat`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ leadId: lead.id, message: text }),
-          });
-        }
+        await fetch(`${baseUrl}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ leadId: lead.id, message: text }),
+        });
       }
     }
 

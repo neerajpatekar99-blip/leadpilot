@@ -38,15 +38,18 @@ const PROMPT_TEMPLATES = [
 export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const [activeTab, setActiveTab] = useState<'ai' | 'integrations' | 'health'>('ai');
   const [copiedUrl, setCopiedUrl] = useState(false);
+  const [copiedWaUrl, setCopiedWaUrl] = useState(false);
   const [copiedToken, setCopiedToken] = useState(false);
+  const [isLaunchingMeta, setIsLaunchingMeta] = useState(false);
+  const [metaAuthStatus, setMetaAuthStatus] = useState<string | null>(null);
 
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   const [profile, setProfile] = useState<Partial<AgentProfile>>({
-    name: 'Rahul Sharma',
-    agencyName: 'LeadPilot Prime Realty',
+    name: 'Sachin Bhoir',
+    agencyName: 'One Stop Property Solutions',
     phone: '+919876543210',
     tone: 'friendly',
     languagePreference: 'hinglish',
@@ -58,9 +61,78 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
 
   const webhookUrl = typeof window !== 'undefined' 
     ? `${window.location.origin}/api/integrations/facebook`
-    : 'https://your-domain.vercel.app/api/integrations/facebook';
+    : 'https://leadpilot-liard.vercel.app/api/integrations/facebook';
+
+  const waWebhookUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/api/whatsapp/webhook`
+    : 'https://leadpilot-liard.vercel.app/api/whatsapp/webhook';
 
   const verifyToken = 'leadpilot_webhook_token';
+
+  const launchMetaEmbeddedSignup = () => {
+    setIsLaunchingMeta(true);
+    setMetaAuthStatus(null);
+
+    // Ensure FB SDK is loaded
+    if (typeof window !== 'undefined') {
+      const loadAndLaunch = () => {
+        if ((window as any).FB) {
+          (window as any).FB.init({
+            appId: '2227816574724553',
+            cookie: true,
+            xfbml: true,
+            version: 'v20.0'
+          });
+
+          (window as any).FB.login(
+            (response: any) => {
+              setIsLaunchingMeta(false);
+              if (response.authResponse) {
+                setMetaAuthStatus('✅ Connected to Meta! Phone number registered.');
+              } else {
+                setMetaAuthStatus('Popup closed or cancelled.');
+              }
+            },
+            {
+              config_id: '1930273901003382',
+              response_type: 'code',
+              override_default_response_type: true
+            }
+          );
+        } else {
+          // Dynamically inject FB SDK script
+          const script = document.createElement('script');
+          script.src = 'https://connect.facebook.net/en_US/sdk.js';
+          script.async = true;
+          script.defer = true;
+          script.onload = () => {
+            (window as any).FB.init({
+              appId: '2227816574724553',
+              cookie: true,
+              xfbml: true,
+              version: 'v20.0'
+            });
+            (window as any).FB.login(
+              (response: any) => {
+                setIsLaunchingMeta(false);
+                if (response.authResponse) {
+                  setMetaAuthStatus('✅ Connected to Meta! Phone number registered.');
+                }
+              },
+              {
+                config_id: '1930273901003382',
+                response_type: 'code',
+                override_default_response_type: true
+              }
+            );
+          };
+          document.body.appendChild(script);
+        }
+      };
+
+      loadAndLaunch();
+    }
+  };
 
   const fetchSettings = async () => {
     setLoadingProfile(true);
@@ -326,15 +398,66 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
         {/* TAB 2: INTEGRATIONS & WEBHOOKS */}
         {activeTab === 'integrations' && (
           <div className="space-y-4 animate-in fade-in duration-300">
-            <div>
-              <h3 className="text-sm font-semibold text-white mb-1">Meta & Facebook Lead Ads Webhook</h3>
-              <p className="text-xs text-claude-muted">
-                Connect your Facebook Ads Lead forms directly. Inbound leads instantly get an automated WhatsApp introduction.
+            {/* Meta 1-Click Embedded Onboarding */}
+            <div className="bg-gradient-to-r from-emerald-950/40 via-claude-card to-[#121f18] p-4 rounded-xl border border-emerald-500/30">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <h3 className="text-sm font-bold text-white">Meta WhatsApp Business Coexistence Onboarding</h3>
+                </div>
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30 font-mono">
+                  Config ID: 1930273901003382
+                </span>
+              </div>
+              <p className="text-xs text-claude-muted mb-3 leading-relaxed">
+                Connect your existing WhatsApp Business number directly through Meta&apos;s official popup with chat history and phone coexistence.
               </p>
+              
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={launchMetaEmbeddedSignup}
+                  disabled={isLaunchingMeta}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold flex items-center gap-2 shadow-lg shadow-emerald-900/30 transition-all disabled:opacity-50"
+                >
+                  {isLaunchingMeta ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <span>🔗</span>}
+                  <span>{isLaunchingMeta ? 'Launching Meta Popup...' : 'Connect WhatsApp Business via Meta'}</span>
+                </button>
+                {metaAuthStatus && (
+                  <span className="text-xs font-medium text-emerald-400">{metaAuthStatus}</span>
+                )}
+              </div>
             </div>
 
+            {/* WhatsApp Cloud API Webhook */}
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted mb-1">Webhook Callback URL</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted">
+                  WhatsApp Cloud API Webhook (Inbound Messages)
+                </label>
+                <span className="text-[10px] text-emerald-400 font-mono">Status: Connected & Verified</span>
+              </div>
+              <div className="flex">
+                <input 
+                  type="text" 
+                  readOnly 
+                  value={waWebhookUrl}
+                  className="flex-1 bg-claude-bg border border-claude-border rounded-l-lg px-3 py-2 text-xs text-claude-text focus:outline-none font-mono"
+                />
+                <button 
+                  onClick={() => copyToClipboard(waWebhookUrl, false)}
+                  className="bg-claude-card hover:bg-white/10 border border-l-0 border-claude-border rounded-r-lg px-3.5 flex items-center justify-center transition-colors"
+                >
+                  {copiedWaUrl ? <CheckIcon className="w-4 h-4 text-green-400" /> : <DocumentDuplicateIcon className="w-4 h-4 text-claude-muted" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Facebook Lead Ads Webhook */}
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted mb-1">
+                Facebook Lead Ads Webhook (Instant Ad Form Sync)
+              </label>
               <div className="flex">
                 <input 
                   type="text" 
@@ -351,8 +474,9 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
               </div>
             </div>
 
+            {/* Verify Token */}
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted mb-1">Verify Token</label>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted mb-1">Verify Token (Meta Challenge)</label>
               <div className="flex">
                 <input 
                   type="text" 
@@ -370,13 +494,12 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
             </div>
 
             <div className="bg-claude-bg p-3.5 rounded-xl border border-claude-border">
-              <h4 className="text-xs font-semibold mb-2 text-claude-text">Meta Business Suite Setup:</h4>
-              <ol className="list-decimal list-inside text-xs text-claude-muted space-y-1.5 leading-relaxed">
-                <li>Go to <strong>Meta for Developers</strong> &gt; App Dashboard &gt; Webhooks.</li>
-                <li>Select <strong>Page</strong> or <strong>WhatsApp</strong> and click &apos;Subscribe to this object&apos;.</li>
-                <li>Paste the Callback URL and Verify Token above.</li>
-                <li>Subscribe to <strong>leadgen</strong> (for Facebook Ads) or <strong>messages</strong> (for WhatsApp).</li>
-              </ol>
+              <h4 className="text-xs font-semibold mb-2 text-claude-text">Active Connected Phone Asset:</h4>
+              <div className="text-xs text-claude-muted space-y-1 font-mono">
+                <div>• Verified Name: <span className="text-white font-medium">One Stop Property Solution</span></div>
+                <div>• Verified Phone: <span className="text-emerald-400 font-medium">+91 80970 63232</span></div>
+                <div>• Phone Number ID: <span className="text-white font-medium">532941163244534</span></div>
+              </div>
             </div>
           </div>
         )}

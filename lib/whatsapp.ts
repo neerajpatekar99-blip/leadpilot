@@ -1,5 +1,6 @@
 const WHATSAPP_API_TOKEN = process.env.WHATSAPP_API_TOKEN;
 const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
+const AISENSY_API_KEY = process.env.AISENSY_API_KEY;
 
 export function formatPhoneNumber(phone: string): string {
   let clean = phone.replace(/[\s\-+()]/g, '');
@@ -12,42 +13,66 @@ export function formatPhoneNumber(phone: string): string {
 }
 
 export async function sendWhatsAppMessage(phone: string, message: string): Promise<boolean> {
-  if (!WHATSAPP_API_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) {
-    console.error('WhatsApp API credentials not found in env vars');
-    return false;
-  }
-
   const to = formatPhoneNumber(phone);
-  const url = `https://graph.facebook.com/v18.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
 
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${WHATSAPP_API_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to: to,
-        type: 'text',
-        text: {
-          preview_url: false,
-          body: message,
+  // 1. Try Meta Cloud API if configured
+  if (WHATSAPP_API_TOKEN && WHATSAPP_PHONE_NUMBER_ID) {
+    const url = `https://graph.facebook.com/v18.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${WHATSAPP_API_TOKEN}`,
+          'Content-Type': 'application/json',
         },
-      }),
-    });
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: to,
+          type: 'text',
+          text: {
+            preview_url: false,
+            body: message,
+          },
+        }),
+      });
 
-    if (!res.ok) {
+      if (res.ok) {
+        return true;
+      }
       const errorData = await res.json();
-      console.error('WhatsApp API Error:', JSON.stringify(errorData));
-      return false;
+      console.warn('Meta WhatsApp API Warning:', JSON.stringify(errorData));
+    } catch (error) {
+      console.warn('Failed to send via Meta Cloud API:', error);
     }
-
-    return true;
-  } catch (error) {
-    console.error('Failed to send WhatsApp message:', error);
-    return false;
   }
+
+  // 2. Try AiSensy API if configured
+  if (AISENSY_API_KEY) {
+    try {
+      const res = await fetch('https://backend.aisensy.com/campaign/t1/api/v2', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          apiKey: AISENSY_API_KEY,
+          campaignName: 'direct_chat',
+          destination: to,
+          userName: 'Lead',
+          templateParams: [message],
+          source: 'leadpilot_ai',
+        }),
+      });
+
+      if (res.ok) {
+        return true;
+      }
+    } catch (err) {
+      console.warn('Failed to send via AiSensy:', err);
+    }
+  }
+
+  return false;
 }
