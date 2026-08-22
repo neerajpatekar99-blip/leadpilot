@@ -188,8 +188,13 @@ async function startWhatsAppGateway() {
           []
         );
 
-        // 5. Send AI Reply over WhatsApp Socket IMMEDIATELY!
-        await sock.sendMessage(remoteJid, { text: aiResponse });
+        // 5. Send AI Reply over WhatsApp Socket with Quoted Context
+        try {
+          await sock.sendMessage(remoteJid, { text: aiResponse }, { quoted: msg });
+        } catch (sendErr) {
+          console.warn('Initial send attempt failed, retrying...', sendErr);
+          await sock.sendMessage(remoteJid, { text: aiResponse });
+        }
         sock.sendPresenceUpdate('paused', remoteJid).catch(() => {});
         
         const duration = Date.now() - startTime;
