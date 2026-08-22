@@ -38,9 +38,20 @@ export async function POST(request: Request) {
         senderName = contact?.profile?.name || phone;
       }
     } 
-    // 2. Check AiSensy / BSP payload format
+    // 2. Check Whapi.cloud payload format
+    else if (body.messages && Array.isArray(body.messages) && body.messages.length > 0) {
+      const msg = body.messages[0];
+      // Ignore outgoing messages sent from the phone itself
+      if (msg.from_me) {
+        return NextResponse.json({ success: true, ignored: 'from_me' }, { status: 200 });
+      }
+      phone = (msg.from || '').replace(/@s\.whatsapp\.net/g, '').replace(/[\s\-+()]/g, '');
+      text = typeof msg.text === 'string' ? msg.text : msg.text?.body;
+      senderName = msg.from_name || phone;
+    }
+    // 3. Check AiSensy / generic BSP payload format
     else if (body.from || body.phone || body.data?.from || body.message || body.data?.message) {
-      phone = body.from || body.phone || body.data?.from || body.data?.phone;
+      phone = (body.from || body.phone || body.data?.from || body.data?.phone || '').replace(/@s\.whatsapp\.net/g, '').replace(/[\s\-+()]/g, '');
       text = typeof body.message === 'string' ? body.message : (body.message?.text || body.data?.message || body.data?.text);
       senderName = body.name || body.data?.name || body.userName || phone;
     }
