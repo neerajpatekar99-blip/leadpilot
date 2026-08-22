@@ -198,11 +198,20 @@ You must output a JSON object containing:
   ];
 
   try {
-    const chatCompletion = await getGroqClient().chat.completions.create({
-      messages,
-      model: 'groq/compound-mini',
-      response_format: { type: 'json_object' },
-    });
+    let chatCompletion;
+    try {
+      chatCompletion = await getGroqClient().chat.completions.create({
+        messages,
+        model: 'groq/compound-mini',
+        response_format: { type: 'json_object' },
+      });
+    } catch {
+      chatCompletion = await getGroqClient().chat.completions.create({
+        messages,
+        model: 'qwen/qwen3.6-27b',
+        response_format: { type: 'json_object' },
+      });
+    }
 
     const responseContent = chatCompletion.choices[0]?.message?.content || '{}';
     return parseJsonSafely(responseContent);
@@ -232,11 +241,20 @@ Only include leads whose budget, locality, and propertyType (if known) align rea
   ];
 
   try {
-    const chatCompletion = await getGroqClient().chat.completions.create({
-      messages,
-      model: 'groq/compound-mini',
-      response_format: { type: 'json_object' },
-    });
+    let chatCompletion;
+    try {
+      chatCompletion = await getGroqClient().chat.completions.create({
+        messages,
+        model: 'groq/compound-mini',
+        response_format: { type: 'json_object' },
+      });
+    } catch {
+      chatCompletion = await getGroqClient().chat.completions.create({
+        messages,
+        model: 'qwen/qwen3.6-27b',
+        response_format: { type: 'json_object' },
+      });
+    }
 
     const responseContent = chatCompletion.choices[0]?.message?.content || '{}';
     const parsed = parseJsonSafely(responseContent);
@@ -269,14 +287,26 @@ If price is given as a single number (e.g. 1.2 Cr), set priceMin to 1.2 Cr (1200
 `;
 
   try {
-    const chatCompletion = await getGroqClient().chat.completions.create({
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: rawText }
-      ],
-      model: 'groq/compound-mini',
-      response_format: { type: 'json_object' },
-    });
+    let chatCompletion;
+    try {
+      chatCompletion = await getGroqClient().chat.completions.create({
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: rawText }
+        ],
+        model: 'groq/compound-mini',
+        response_format: { type: 'json_object' },
+      });
+    } catch {
+      chatCompletion = await getGroqClient().chat.completions.create({
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: rawText }
+        ],
+        model: 'qwen/qwen3.6-27b',
+        response_format: { type: 'json_object' },
+      });
+    }
 
     const responseContent = chatCompletion.choices[0]?.message?.content || '{}';
     return parseJsonSafely(responseContent);

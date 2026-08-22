@@ -91,17 +91,28 @@ export async function createProperty(data: Omit<Property, 'id' | 'createdAt'>): 
 export async function getProperties(filters?: { status?: string }): Promise<Property[]> {
   if (isFirebaseConfigured() && adminDb) {
     try {
-      let query: any = adminDb.collection(PROPERTIES_COLLECTION);
-      if (filters?.status) {
-        query = query.where('status', '==', filters.status);
+      let snapshot;
+      try {
+        let query: any = adminDb.collection(PROPERTIES_COLLECTION);
+        if (filters?.status) {
+          query = query.where('status', '==', filters.status);
+        }
+        query = query.orderBy('createdAt', 'desc').limit(100);
+        snapshot = await query.get();
+      } catch {
+        let query: any = adminDb.collection(PROPERTIES_COLLECTION);
+        if (filters?.status) {
+          query = query.where('status', '==', filters.status);
+        }
+        snapshot = await query.limit(100).get();
       }
-      query = query.orderBy('createdAt', 'desc').limit(100);
-      const snapshot = await query.get();
-      if (!snapshot.empty) {
-        return snapshot.docs.map((doc: any) => doc.data() as Property);
-      }
+
+      return snapshot.docs
+        .map((doc: any) => ({ id: doc.id, ...doc.data() } as Property))
+        .sort((a: Property, b: Property) => (b.createdAt || 0) - (a.createdAt || 0));
     } catch (error) {
-      console.warn('[Firestore] Failed to get properties from Firebase, using memory store:', error);
+      console.warn('[Firestore] Failed to get properties from Firebase:', error);
+      return [];
     }
   }
 

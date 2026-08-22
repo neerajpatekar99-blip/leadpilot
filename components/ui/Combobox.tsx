@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
 
 export interface ComboboxOption {
@@ -20,14 +20,16 @@ export function Combobox({ value, onChange, options, placeholder = "Select or ty
   const [inputValue, setInputValue] = useState(value);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const normalizedOptions: ComboboxOption[] = options.map(opt => 
-    typeof opt === 'string' ? { value: opt, label: opt } : opt
-  );
+  const normalizedOptions: ComboboxOption[] = useMemo(() => {
+    return options.map(opt => 
+      typeof opt === 'string' ? { value: opt, label: opt } : opt
+    );
+  }, [options]);
 
   useEffect(() => {
     const matched = normalizedOptions.find(o => o.value === value);
     setInputValue(matched ? matched.label : value);
-  }, [value, options]);
+  }, [value, normalizedOptions]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {

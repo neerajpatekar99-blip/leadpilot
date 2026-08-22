@@ -49,16 +49,26 @@ export async function createVisit(data: Partial<SiteVisit>): Promise<SiteVisit> 
 export async function getVisits(): Promise<SiteVisit[]> {
   if (isFirebaseConfigured() && adminDb) {
     try {
-      const snapshot = await adminDb.collection(VISITS_COLLECTION)
-        .orderBy('scheduledAt', 'asc')
-        .limit(50)
-        .get();
-      
-      if (!snapshot.empty) {
-        return snapshot.docs.map((doc: any) => doc.data() as SiteVisit);
+      let snapshot;
+      try {
+        snapshot = await adminDb.collection(VISITS_COLLECTION)
+          .orderBy('scheduledAt', 'asc')
+          .limit(50)
+          .get();
+      } catch {
+        snapshot = await adminDb.collection(VISITS_COLLECTION).limit(50).get();
       }
+      
+      return snapshot.docs
+        .map((doc: any) => ({ id: doc.id, ...doc.data() } as SiteVisit))
+        .sort((a: SiteVisit, b: SiteVisit) => {
+          const timeA = a.scheduledAt || (a.createdAt ? a.createdAt : 0);
+          const timeB = b.scheduledAt || (b.createdAt ? b.createdAt : 0);
+          return timeA - timeB;
+        });
     } catch (error) {
-      console.warn('[Firestore] Failed to get visits from Firebase, using memory store:', error);
+      console.warn('[Firestore] Failed to get visits from Firebase:', error);
+      return [];
     }
   }
 

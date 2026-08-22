@@ -124,18 +124,23 @@ export async function createLead(data: Partial<Lead>): Promise<Lead> {
 export async function getLeads(): Promise<Lead[]> {
   if (isFirebaseConfigured() && adminDb) {
     try {
-      const snapshot = await adminDb.collection(LEADS_COLLECTION)
-        .orderBy('createdAt', 'desc')
-        .limit(100)
-        .get();
-      
-      if (!snapshot.empty) {
-        return snapshot.docs
-          .map((doc: any) => doc.data() as Lead)
-          .filter((lead: Lead) => !lead.deletedAt);
+      let snapshot;
+      try {
+        snapshot = await adminDb.collection(LEADS_COLLECTION)
+          .orderBy('createdAt', 'desc')
+          .limit(100)
+          .get();
+      } catch {
+        snapshot = await adminDb.collection(LEADS_COLLECTION).limit(100).get();
       }
+      
+      return snapshot.docs
+        .map((doc: any) => ({ id: doc.id, ...doc.data() } as Lead))
+        .filter((lead: Lead) => !lead.deletedAt)
+        .sort((a: Lead, b: Lead) => (b.createdAt || 0) - (a.createdAt || 0));
     } catch (error) {
-      console.warn('[Firestore] Failed to get leads from Firebase, using memory store:', error);
+      console.warn('[Firestore] Failed to get leads from Firebase:', error);
+      return [];
     }
   }
 

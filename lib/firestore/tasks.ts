@@ -54,16 +54,22 @@ export async function createTask(data: Partial<ActionItem>): Promise<ActionItem>
 export async function getTasks(): Promise<ActionItem[]> {
   if (isFirebaseConfigured() && adminDb) {
     try {
-      const snapshot = await adminDb.collection(TASKS_COLLECTION)
-        .orderBy('createdAt', 'desc')
-        .limit(50)
-        .get();
-      
-      if (!snapshot.empty) {
-        return snapshot.docs.map((doc: any) => doc.data() as ActionItem);
+      let snapshot;
+      try {
+        snapshot = await adminDb.collection(TASKS_COLLECTION)
+          .orderBy('createdAt', 'desc')
+          .limit(50)
+          .get();
+      } catch {
+        snapshot = await adminDb.collection(TASKS_COLLECTION).limit(50).get();
       }
+      
+      return snapshot.docs
+        .map((doc: any) => ({ id: doc.id, ...doc.data() } as ActionItem))
+        .sort((a: ActionItem, b: ActionItem) => (b.createdAt || 0) - (a.createdAt || 0));
     } catch (error) {
-      console.warn('[Firestore] Failed to get tasks from Firebase, using memory store:', error);
+      console.warn('[Firestore] Failed to get tasks from Firebase:', error);
+      return [];
     }
   }
 
