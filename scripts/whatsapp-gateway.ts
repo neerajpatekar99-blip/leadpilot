@@ -117,20 +117,31 @@ async function startWhatsAppGateway() {
       if (!msg.message) continue;
 
       const remoteJid = msg.key.remoteJid;
-      if (!remoteJid || remoteJid.endsWith('@g.us')) continue; // Ignore group messages
+      if (!remoteJid || remoteJid.endsWith('@g.us') || remoteJid === 'status@broadcast') continue;
 
-      const rawPhone = remoteJid.replace('@s.whatsapp.net', '');
-      const pushName = msg.pushName || 'Inbound Lead';
-      
-      const messageText = msg.message.conversation || 
-                          msg.message.extendedTextMessage?.text || 
-                          msg.message.imageMessage?.caption || 
-                          '';
+      // Extract message text across all WhatsApp message wrappers
+      const m = msg.message;
+      const messageText = (
+        m.conversation ||
+        m.extendedTextMessage?.text ||
+        m.ephemeralMessage?.message?.extendedTextMessage?.text ||
+        m.ephemeralMessage?.message?.conversation ||
+        m.viewOnceMessage?.message?.extendedTextMessage?.text ||
+        m.viewOnceMessage?.message?.conversation ||
+        m.viewOnceMessageV2?.message?.extendedTextMessage?.text ||
+        m.viewOnceMessageV2?.message?.conversation ||
+        m.imageMessage?.caption ||
+        m.videoMessage?.caption ||
+        ''
+      ).trim();
 
-      if (!messageText.trim()) continue;
+      if (!messageText) continue;
 
-      // Ignore messages sent by ourselves from the phone
+      // Only ignore outgoing messages if they are not to ourselves for testing
       if (msg.key.fromMe) continue;
+
+      const rawPhone = remoteJid.replace('@s.whatsapp.net', '').replace('@lid', '');
+      const pushName = msg.pushName || 'Buyer';
 
       console.log(`\n📩 Inbound WhatsApp from ${pushName} (+${rawPhone}): "${messageText}"`);
 
