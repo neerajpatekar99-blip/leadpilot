@@ -58,12 +58,15 @@ async function startWhatsAppGateway() {
     logger: pino({ level: 'silent' }),
     printQRInTerminal: false,
     auth: state,
-    browser: ['Ubuntu', 'Chrome', '20.0.04'],
+    browser: ['LeadPilot CRM', 'Chrome', '120.0.0'],
     syncFullHistory: false,
     connectTimeoutMs: 60000,
     keepAliveIntervalMs: 25000,
     defaultQueryTimeoutMs: 60000,
     generateHighQualityLinkPreview: false,
+    getMessage: async (key) => {
+      return undefined;
+    },
   });
 
   sock.ev.on('creds.update', saveCreds);
@@ -188,17 +191,28 @@ async function startWhatsAppGateway() {
           []
         );
 
-        // 5. Send AI Reply over WhatsApp Socket with Quoted Context
+        // 5. Determine target JID (resolve LID to phone number if available)
+        const participantJid = msg.key.participant;
+        let targetJid = remoteJid;
+        if (remoteJid.endsWith('@lid') && participantJid && participantJid.endsWith('@s.whatsapp.net')) {
+          targetJid = participantJid;
+        }
+
+        // Send AI Reply over WhatsApp Socket
         try {
-          await sock.sendMessage(remoteJid, { text: aiResponse }, { quoted: msg });
+          await sock.sendMessage(targetJid, { text: aiResponse });
         } catch (sendErr) {
-          console.warn('Initial send attempt failed, retrying...', sendErr);
-          await sock.sendMessage(remoteJid, { text: aiResponse });
+          console.warn(`Direct send to ${targetJid} failed, trying alternative target...`);
+          if (targetJid !== remoteJid) {
+            await sock.sendMessage(remoteJid, { text: aiResponse });
+          } else {
+            throw sendErr;
+          }
         }
         sock.sendPresenceUpdate('paused', remoteJid).catch(() => {});
         
         const duration = Date.now() - startTime;
-        console.log(`⚡ Sent AI reply to ${pushName} in ${duration}ms: "${aiResponse}"`);
+        console.log(`⚡ Sent AI reply to ${pushName} (${targetJid}) in ${duration}ms: "${aiResponse}"`);
 
         // 6. Update in-memory message history
         const leadMsg: Message = { id: `m-${Date.now()}-1`, leadId: lead.id, role: 'lead', content: messageText, timestamp: Date.now() };
