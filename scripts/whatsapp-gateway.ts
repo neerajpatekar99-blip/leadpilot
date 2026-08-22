@@ -24,9 +24,12 @@ const AUTH_DIR = path.resolve(__dirname, '../whatsapp_auth_info');
 const recentMessagesCache = new Map<string, Message[]>();
 const leadsCache = new Map<string, Lead>();
 let cachedAgentProfile: AgentProfile = {
+  id: 'default_agent',
   name: 'Sachin Bhoir',
   agencyName: 'One Stop Property Solutions',
   phone: '+919876543210',
+  specializations: ['Residential 1BHK/2BHK/3BHK', 'Commercial', 'Plots'],
+  activeLocalities: ['Kharghar', 'Navi Mumbai', 'Panvel', 'Thane'],
   tone: 'friendly',
   languagePreference: 'hinglish',
   customInstructions: '1. Only discuss real estate: properties, pricing, localities, site visits, buying, selling, renting.\n2. Keep responses to ONE line without dashes.\n3. Escalate only for confirmed site visit booking or token payments.',
