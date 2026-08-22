@@ -129,16 +129,8 @@ async function startWhatsAppGateway() {
 
       if (!messageText.trim()) continue;
 
-      // Detect human manual reply from Sachin Sir's phone
-      if (msg.key.fromMe) {
-        console.log(`👤 Human Agent replied to ${rawPhone}: "${messageText}". Pausing AI.`);
-        const cachedLead = leadsCache.get(rawPhone);
-        if (cachedLead) {
-          cachedLead.aiStatus = 'agent_took_over';
-          updateLead(cachedLead.id, { aiStatus: 'agent_took_over' }).catch(() => {});
-        }
-        continue;
-      }
+      // Ignore messages sent by ourselves from the phone
+      if (msg.key.fromMe) continue;
 
       console.log(`\n📩 Inbound WhatsApp from ${pushName} (+${rawPhone}): "${messageText}"`);
 
@@ -169,16 +161,9 @@ async function startWhatsAppGateway() {
             createdAt: Date.now(),
           };
           leadsCache.set(rawPhone, lead);
-          // Async save to Firestore in background
           createLead(lead).then(created => {
             if (created) leadsCache.set(rawPhone, created);
           }).catch(() => {});
-        }
-
-        if (lead.aiStatus === 'agent_took_over') {
-          console.log(`⏸️ Agent took over for ${lead.name}. Skipping auto-reply.`);
-          sock.sendPresenceUpdate('paused', remoteJid).catch(() => {});
-          continue;
         }
 
         let history = recentMessagesCache.get(rawPhone) || [];
