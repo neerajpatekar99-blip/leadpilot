@@ -117,8 +117,6 @@ async function startWhatsAppGateway() {
 
   // Handle incoming messages
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
-    if (type !== 'notify') return;
-
     for (const msg of messages) {
       if (!msg.message) continue;
 
