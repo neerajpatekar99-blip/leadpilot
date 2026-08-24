@@ -251,7 +251,6 @@ async function startWhatsAppGateway() {
         console.log(`⚡ Sent AI reply to ${pushName} (${targetJid}) in ${duration}ms: "${aiResponse}"`);
 
         // 6. Update in-memory message history
-        const leadMsg: Message = { id: `m-${Date.now()}-1`, leadId: lead.id, role: 'lead', content: messageText, timestamp: Date.now() };
         const aiMsg: Message = { id: `m-${Date.now()}-2`, leadId: lead.id, role: 'ai', content: aiResponse, timestamp: Date.now() };
         history.push(leadMsg, aiMsg);
         if (history.length > 10) history = history.slice(-10);
@@ -260,7 +259,6 @@ async function startWhatsAppGateway() {
         // 7. Non-blocking background Firestore sync
         setTimeout(async () => {
           try {
-            saveMessage(lead.id, leadMsg).catch(() => {});
             saveMessage(lead.id, aiMsg).catch(() => {});
 
             const updates: any = {};
