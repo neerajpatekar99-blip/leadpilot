@@ -1,3 +1,4 @@
+import fs from 'fs';
 import http from 'http';
 import makeWASocket, {
   DisconnectReason,
@@ -85,21 +86,31 @@ async function startWhatsAppGateway() {
 
   sock.ev.on('creds.update', saveCreds);
 
-  // If not already registered, generate a Pairing Code
-  if (!sock.authState.creds.registered) {
-    setTimeout(async () => {
-      try {
-        const cleanPhone = TARGET_PHONE.replace(/[^0-9]/g, '');
-        console.log(`\n⏳ Generating live WhatsApp Pairing Code for +${cleanPhone}...`);
-        const pairingCode = await sock.requestPairingCode(cleanPhone);
-        
-        console.log('\n======================================================');
-        console.log(`🔑 LIVE WHATSAPP PAIRING CODE:  ${pairingCode}`);
-        console.log('======================================================');
-      } catch (err) {
-        console.error('Error requesting pairing code:', err);
+  // If not already registered, generate a Pairing Code with retry loop
+  let pairingCodeRequested = false;
+  const requestPairing = async (retryCount = 0) => {
+    if (pairingCodeRequested || sock.authState.creds.registered) return;
+    try {
+      const cleanPhone = TARGET_PHONE.replace(/[^0-9]/g, '');
+      console.log(`\n⏳ Requesting live WhatsApp Pairing Code for +${cleanPhone}...`);
+      const pairingCode = await sock.requestPairingCode(cleanPhone);
+      pairingCodeRequested = true;
+      
+      console.log('\n======================================================');
+      console.log(`🔑 LIVE WHATSAPP PAIRING CODE:  ${pairingCode}`);
+      console.log('======================================================\n');
+    } catch (err: any) {
+      if (retryCount < 5 && !sock.authState.creds.registered) {
+        console.log(`⏳ Socket initializing, retrying pairing code in 3s (attempt ${retryCount + 1}/5)...`);
+        setTimeout(() => requestPairing(retryCount + 1), 3000);
+      } else {
+        console.error('Error requesting pairing code:', err?.message || err);
       }
-    }, 2000);
+    }
+  };
+
+  if (!sock.authState.creds.registered) {
+    setTimeout(() => requestPairing(), 4000);
   }
 
   sock.ev.on('connection.update', async (update) => {
@@ -114,11 +125,20 @@ async function startWhatsAppGateway() {
 
     if (connection === 'close') {
       const statusCode = (lastDisconnect?.error as any)?.output?.statusCode;
-      const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-      console.log(`Connection closed (status ${statusCode}), reconnecting:`, shouldReconnect);
-      if (shouldReconnect) {
-        setTimeout(() => startWhatsAppGateway(), 3000);
+      const isLoggedOut = statusCode === DisconnectReason.loggedOut;
+      console.log(`Connection closed (status ${statusCode}), loggedOut: ${isLoggedOut}`);
+      
+      if (isLoggedOut || statusCode === 401) {
+        console.log('🧹 Clearing stale session keys to generate fresh clean pairing code...');
+        try {
+          if (fs.existsSync(AUTH_DIR)) {
+            fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+          }
+        } catch (e) {}
       }
+
+      console.log('🔄 Reconnecting in 3 seconds...');
+      setTimeout(() => startWhatsAppGateway(), 3000);
     } else if (connection === 'open') {
       console.log('\n======================================================');
       console.log('✅ WHATSAPP CONNECTED & LIVE! Sachin Sir is linked! 🚀');
