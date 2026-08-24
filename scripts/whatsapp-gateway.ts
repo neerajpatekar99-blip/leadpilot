@@ -247,11 +247,18 @@ async function startWhatsAppGateway() {
               lead.aiStatus = 'needs_agent';
               shouldUpdate = true;
             }
-            if (extractedInfo.budget && !lead.budget) { updates.budget = extractedInfo.budget; lead.budget = extractedInfo.budget; shouldUpdate = true; }
-            if (extractedInfo.locality && !lead.locality) { updates.locality = extractedInfo.locality; lead.locality = extractedInfo.locality; shouldUpdate = true; }
-            if (extractedInfo.propertyType && !lead.propertyType) { updates.propertyType = extractedInfo.propertyType; lead.propertyType = extractedInfo.propertyType; shouldUpdate = true; }
-            if (extractedInfo.aiSummary) { updates.aiSummary = extractedInfo.aiSummary; shouldUpdate = true; }
-            if (extractedInfo.leadScore) { updates.leadScore = extractedInfo.leadScore; shouldUpdate = true; }
+            if (extractedInfo.intent && lead.intent !== extractedInfo.intent) { updates.intent = extractedInfo.intent; lead.intent = extractedInfo.intent; shouldUpdate = true; }
+            if (extractedInfo.budget && lead.budget !== extractedInfo.budget) { updates.budget = extractedInfo.budget; lead.budget = extractedInfo.budget; shouldUpdate = true; }
+            if (extractedInfo.locality && lead.locality !== extractedInfo.locality) { updates.locality = extractedInfo.locality; lead.locality = extractedInfo.locality; shouldUpdate = true; }
+            if (extractedInfo.propertyType && lead.propertyType !== extractedInfo.propertyType) { updates.propertyType = extractedInfo.propertyType; lead.propertyType = extractedInfo.propertyType; shouldUpdate = true; }
+            if (extractedInfo.configuration && lead.configuration !== extractedInfo.configuration) { updates.configuration = extractedInfo.configuration; lead.configuration = extractedInfo.configuration; shouldUpdate = true; }
+            if (extractedInfo.specs && lead.specs !== extractedInfo.specs) { updates.specs = extractedInfo.specs; lead.specs = extractedInfo.specs; shouldUpdate = true; }
+            if (extractedInfo.loanStatus && lead.loanStatus !== extractedInfo.loanStatus) { updates.loanStatus = extractedInfo.loanStatus; lead.loanStatus = extractedInfo.loanStatus; shouldUpdate = true; }
+            if (extractedInfo.timeline && lead.timeline !== extractedInfo.timeline) { updates.timeline = extractedInfo.timeline; lead.timeline = extractedInfo.timeline; shouldUpdate = true; }
+            if (extractedInfo.isDecisionMaker && lead.isDecisionMaker !== extractedInfo.isDecisionMaker) { updates.isDecisionMaker = extractedInfo.isDecisionMaker; lead.isDecisionMaker = extractedInfo.isDecisionMaker; shouldUpdate = true; }
+            if (extractedInfo.hasOtherBroker && lead.hasOtherBroker !== extractedInfo.hasOtherBroker) { updates.hasOtherBroker = extractedInfo.hasOtherBroker; lead.hasOtherBroker = extractedInfo.hasOtherBroker; shouldUpdate = true; }
+            if (extractedInfo.aiSummary && extractedInfo.aiSummary !== lead.aiSummary) { updates.aiSummary = extractedInfo.aiSummary; lead.aiSummary = extractedInfo.aiSummary; shouldUpdate = true; }
+            if (extractedInfo.leadScore && extractedInfo.leadScore !== lead.leadScore) { updates.leadScore = extractedInfo.leadScore; lead.leadScore = extractedInfo.leadScore; shouldUpdate = true; }
 
             if (shouldUpdate) {
               updateLead(lead.id, updates).catch(() => {});

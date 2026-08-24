@@ -31,10 +31,18 @@ EXAMPLE:
 "Hi ${lead.name || ''}, happy to help you find the right property. Which area are you looking at?"`;
 
   try {
-    const chatCompletion = await getGroqClient().chat.completions.create({
-      messages: [{ role: 'system', content: systemPrompt }],
-      model: 'groq/compound-mini',
-    });
+    let chatCompletion;
+    try {
+      chatCompletion = await getGroqClient().chat.completions.create({
+        messages: [{ role: 'system', content: systemPrompt }],
+        model: 'openai/gpt-oss-20b',
+      });
+    } catch {
+      chatCompletion = await getGroqClient().chat.completions.create({
+        messages: [{ role: 'system', content: systemPrompt }],
+        model: 'qwen/qwen3.6-27b',
+      });
+    }
 
     const aiMessage = chatCompletion.choices[0]?.message?.content?.trim();
 

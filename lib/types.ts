@@ -10,12 +10,20 @@ export interface Lead {
   createdAt: number;
   lastContactedAt?: number;
   notes?: string;
-  // CRM AI Fields
+  // CRM AI & Qualification Fields (Sachin Sir Questionnaire)
   aiSummary?: string;
   leadScore?: 'Hot' | 'Warm' | 'Cold' | 'Unscored';
+  intent?: 'buy' | 'rent' | 'sell' | 'invest';
   budget?: string;
   locality?: string;
   propertyType?: string;
+  configuration?: string;
+  specs?: string;
+  loanStatus?: 'needs_loan' | 'pre_approved' | 'self_funded' | 'not_decided';
+  timeline?: string;
+  isDecisionMaker?: 'yes' | 'no' | 'joint';
+  hasOtherBroker?: 'yes' | 'no';
+  preferredContact?: 'whatsapp' | 'call' | 'email';
   deletedAt?: number;
 }
 
@@ -74,6 +82,8 @@ export interface AgentProfile {
   name: string;
   agencyName: string;
   phone: string;
+  email?: string;
+  officeAddress?: string;
   specializations: string[];
   activeLocalities: string[];
   customInstructions?: string;

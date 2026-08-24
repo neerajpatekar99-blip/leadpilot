@@ -78,20 +78,36 @@ export async function getLeadById(id: string): Promise<Lead | null> {
 }
 
 export async function getLeadByPhone(phone: string): Promise<Lead | null> {
+  const digitsOnly = phone.replace(/[^0-9]/g, '');
+  const last10 = digitsOnly.slice(-10);
+  const possiblePhones = Array.from(new Set([
+    phone,
+    digitsOnly,
+    `+${digitsOnly}`,
+    last10,
+    `+91${last10}`,
+    `91${last10}`
+  ])).filter(Boolean);
+
   if (isFirebaseConfigured() && adminDb) {
     try {
-      const snapshot = await adminDb.collection(LEADS_COLLECTION)
-        .where('phone', '==', phone)
-        .limit(1)
-        .get();
-        
-      if (!snapshot.empty) return snapshot.docs[0].data() as Lead;
+      for (const p of possiblePhones) {
+        const snapshot = await adminDb.collection(LEADS_COLLECTION)
+          .where('phone', '==', p)
+          .limit(1)
+          .get();
+          
+        if (!snapshot.empty) return snapshot.docs[0].data() as Lead;
+      }
     } catch (error) {
       console.warn('[Firestore] Failed to get lead by phone from Firebase:', error);
     }
   }
 
-  return memoryLeads.find(l => l.phone === phone) || null;
+  return memoryLeads.find(l => {
+    const lDigits = (l.phone || '').replace(/[^0-9]/g, '').slice(-10);
+    return lDigits && lDigits === last10;
+  }) || null;
 }
 
 export async function updateLead(id: string, updates: Partial<Lead>): Promise<void> {

@@ -7,6 +7,23 @@ import { createVisit } from '@/lib/firestore/visits';
 import { findMatchingProperties } from '@/lib/firestore/properties';
 import { getAgentProfile } from '@/lib/firestore/agent';
 
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const leadId = searchParams.get('leadId');
+
+    if (!leadId) {
+      return NextResponse.json({ error: 'Missing leadId' }, { status: 400 });
+    }
+
+    const messages = await getConversation(leadId);
+    return NextResponse.json({ success: true, data: messages });
+  } catch (error) {
+    console.error('Get Conversation Error:', error);
+    return NextResponse.json({ error: 'Failed to fetch conversation' }, { status: 500 });
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const { leadId, message } = await request.json();
@@ -54,7 +71,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Generate AI response
+    // Generate AI response with questionnaire qualification flow
     const { message: aiResponse, needsAgent, extractedInfo } = await generateAIResponse(
       lead, 
       history, 
@@ -71,12 +88,12 @@ export async function POST(request: Request) {
       timestamp: Date.now(),
     });
 
-    // Send WhatsApp (Only if opted in, though inbound webhooks usually imply opt-in)
+    // Send WhatsApp (Only if opted in)
     if (lead.consentStatus === 'opted_in') {
       await sendWhatsAppMessage(lead.phone, aiResponse);
     }
 
-    // Update lead fields based on extraction or qualification
+    // Update lead fields based on Sachin Sir questionnaire extraction
     const updates: any = {};
     let shouldUpdateLead = false;
 
@@ -86,24 +103,46 @@ export async function POST(request: Request) {
       shouldUpdateLead = true;
     }
     
-    if (extractedInfo.budget && !lead.budget) { 
+    if (extractedInfo.intent && (!lead.intent || lead.intent !== extractedInfo.intent)) {
+      updates.intent = extractedInfo.intent;
+      shouldUpdateLead = true;
+    }
+    if (extractedInfo.budget && (!lead.budget || lead.budget !== extractedInfo.budget)) { 
       updates.budget = extractedInfo.budget; 
       shouldUpdateLead = true; 
     }
-    if (extractedInfo.locality && !lead.locality) { 
+    if (extractedInfo.locality && (!lead.locality || lead.locality !== extractedInfo.locality)) { 
       updates.locality = extractedInfo.locality; 
       shouldUpdateLead = true; 
     }
-    if (extractedInfo.propertyType && !lead.propertyType) { 
+    if (extractedInfo.propertyType && (!lead.propertyType || lead.propertyType !== extractedInfo.propertyType)) { 
       updates.propertyType = extractedInfo.propertyType; 
       shouldUpdateLead = true; 
     }
-    
-    if (extractedInfo.timeline && !lead.notes?.includes('Timeline:')) {
-      updates.notes = (lead.notes ? lead.notes + '\n' : '') + 'Timeline: ' + extractedInfo.timeline;
+    if (extractedInfo.configuration && (!lead.configuration || lead.configuration !== extractedInfo.configuration)) {
+      updates.configuration = extractedInfo.configuration;
       shouldUpdateLead = true;
     }
-
+    if (extractedInfo.specs && (!lead.specs || lead.specs !== extractedInfo.specs)) {
+      updates.specs = extractedInfo.specs;
+      shouldUpdateLead = true;
+    }
+    if (extractedInfo.loanStatus && (!lead.loanStatus || lead.loanStatus !== extractedInfo.loanStatus)) {
+      updates.loanStatus = extractedInfo.loanStatus;
+      shouldUpdateLead = true;
+    }
+    if (extractedInfo.timeline && (!lead.timeline || lead.timeline !== extractedInfo.timeline)) {
+      updates.timeline = extractedInfo.timeline;
+      shouldUpdateLead = true;
+    }
+    if (extractedInfo.isDecisionMaker && (!lead.isDecisionMaker || lead.isDecisionMaker !== extractedInfo.isDecisionMaker)) {
+      updates.isDecisionMaker = extractedInfo.isDecisionMaker;
+      shouldUpdateLead = true;
+    }
+    if (extractedInfo.hasOtherBroker && (!lead.hasOtherBroker || lead.hasOtherBroker !== extractedInfo.hasOtherBroker)) {
+      updates.hasOtherBroker = extractedInfo.hasOtherBroker;
+      shouldUpdateLead = true;
+    }
     if (extractedInfo.aiSummary && extractedInfo.aiSummary !== lead.aiSummary) {
       updates.aiSummary = extractedInfo.aiSummary;
       shouldUpdateLead = true;
