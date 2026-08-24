@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "postinstall": "node scripts/patch-baileys.js",
     "whatsapp": "tsx scripts/whatsapp-gateway.ts"
   },
   "dependencies": {
