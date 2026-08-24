@@ -1,3 +1,4 @@
+import http from 'http';
 import makeWASocket, {
   DisconnectReason,
   useMultiFileAuthState,
@@ -17,8 +18,18 @@ import { AgentProfile, Message, Lead } from '../lib/types';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
 
+const PORT = process.env.PORT || 3000;
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('LeadPilot WhatsApp Gateway is Live 24/7!\n');
+});
+server.listen(PORT, () => {
+  console.log(`🌐 Healthcheck HTTP server listening on port ${PORT}`);
+});
+
 const TARGET_PHONE = process.env.WHATSAPP_LINK_PHONE || '919870178204'; // Sachin Sir's number
 const AUTH_DIR = path.resolve(__dirname, '../whatsapp_auth_info');
+
 
 // In-Memory High Speed Caches (0ms retrieval)
 const recentMessagesCache = new Map<string, Message[]>();
