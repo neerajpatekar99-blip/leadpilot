@@ -186,14 +186,7 @@ async function startWhatsAppGateway() {
       const startTime = Date.now();
 
       try {
-        // 2. Check Master AI Killswitch in memory
-        if (cachedAgentProfile.aiEnabled === false) {
-          console.log('🛑 Master AI Killswitch is active. Skipping auto-reply.');
-          sock.sendPresenceUpdate('paused', remoteJid).catch(() => {});
-          continue;
-        }
-
-        // 3. Fast In-Memory Lead & History retrieval (0ms)
+        // 2. Fast In-Memory Lead retrieval
         let lead = leadsCache.get(rawPhone);
         if (!lead) {
           lead = {
@@ -210,6 +203,17 @@ async function startWhatsAppGateway() {
           createLead(lead).then(created => {
             if (created) leadsCache.set(rawPhone, created);
           }).catch(() => {});
+        }
+
+        // Save incoming lead message to conversation history
+        const leadMsg: Message = { id: `m-${Date.now()}-1`, leadId: lead.id, role: 'lead', content: messageText, timestamp: Date.now() };
+        saveMessage(lead.id, leadMsg).catch(() => {});
+
+        // 3. Check Master AI Killswitch in memory
+        if (cachedAgentProfile.aiEnabled === false) {
+          console.log(`🛑 Master AI Killswitch is active (Manual Mode). Recorded message from ${pushName} but skipped auto-reply.`);
+          sock.sendPresenceUpdate('paused', remoteJid).catch(() => {});
+          continue;
         }
 
         let history = recentMessagesCache.get(rawPhone) || [];
