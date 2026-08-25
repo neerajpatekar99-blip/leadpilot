@@ -1,8 +1,3 @@
-const WHATSAPP_API_TOKEN = process.env.WHATSAPP_API_TOKEN;
-const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
-const AISENSY_API_KEY = process.env.AISENSY_API_KEY;
-const WHAPI_API_TOKEN = process.env.WHAPI_API_TOKEN;
-
 export function formatPhoneNumber(phone: string): string {
   let clean = phone.replace(/[\s\-+()]/g, '').replace(/@s\.whatsapp\.net/g, '');
   
@@ -15,6 +10,10 @@ export function formatPhoneNumber(phone: string): string {
 
 export async function sendWhatsAppMessage(phone: string, message: string): Promise<boolean> {
   const to = formatPhoneNumber(phone);
+  const WHATSAPP_API_TOKEN = process.env.WHATSAPP_API_TOKEN?.trim();
+  const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim();
+  const AISENSY_API_KEY = process.env.AISENSY_API_KEY?.trim();
+  const WHAPI_API_TOKEN = process.env.WHAPI_API_TOKEN?.trim();
 
   // 1. Try Whapi Cloud API if configured (Priority for Linked Devices)
   if (WHAPI_API_TOKEN) {

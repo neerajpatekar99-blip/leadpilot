@@ -37,6 +37,17 @@ export default function PropertiesPage() {
     }
   };
 
+  const handleDeleteProperty = async (id: string) => {
+    try {
+      const res = await fetch(`/api/properties?id=${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setProperties(prev => prev.filter(p => p.id !== id));
+      }
+    } catch (e) {
+      console.error('Failed to delete property:', e);
+    }
+  };
+
   useEffect(() => {
     fetchProperties();
   }, []);
@@ -166,7 +177,10 @@ export default function PropertiesPage() {
           {loading ? (
             <div className="p-12 text-center text-claude-muted text-sm">Loading properties catalog...</div>
           ) : (
-            <PropertyTable properties={filteredProperties} />
+            <PropertyTable 
+              properties={filteredProperties} 
+              onDelete={handleDeleteProperty}
+            />
           )}
         </div>
 

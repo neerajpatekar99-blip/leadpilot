@@ -5,7 +5,7 @@ import { sendWhatsAppMessage } from '@/lib/whatsapp';
 import { createTask } from '@/lib/firestore/tasks';
 import { createVisit } from '@/lib/firestore/visits';
 import { findMatchingProperties } from '@/lib/firestore/properties';
-import { getAgentProfile } from '@/lib/firestore/agent';
+import { getAgentProfile, isNumberExcluded } from '@/lib/firestore/agent';
 
 export async function GET(request: Request) {
   try {
@@ -19,8 +19,8 @@ export async function GET(request: Request) {
     const messages = await getConversation(leadId);
     return NextResponse.json({ success: true, data: messages });
   } catch (error) {
-    console.error('Get Conversation Error:', error);
-    return NextResponse.json({ error: 'Failed to fetch conversation' }, { status: 500 });
+    console.error('Error fetching chat history:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -37,17 +37,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
     }
 
-    if (lead.aiStatus === 'agent_took_over') {
-      return NextResponse.json({ error: 'agent handling', stopped: true }, { status: 400 });
-    }
-
-    // Fetch dynamic agent profile & check Master AI Killswitch
+    // Fetch dynamic agent profile & check Master AI Killswitch and Excluded Numbers
     const agentProfile = await getAgentProfile();
     if (agentProfile.aiEnabled === false) {
       return NextResponse.json({ 
         error: 'AI operations are currently stopped by agent in manual mode.', 
         stopped: true 
       }, { status: 403 });
+    }
+
+    if (isNumberExcluded(lead.phone, agentProfile, lead)) {
+      return NextResponse.json({ 
+        error: 'Saved / Excluded contact: AI auto-reply is disabled for this number.', 
+        stopped: true 
+      }, { status: 200 });
     }
 
     // Fetch conversation history BEFORE adding the new message
@@ -93,7 +96,7 @@ export async function POST(request: Request) {
       await sendWhatsAppMessage(lead.phone, aiResponse);
     }
 
-    // Update lead fields based on Sachin Sir questionnaire extraction
+    // Update lead fields based on qualification questionnaire extraction
     const updates: any = {};
     let shouldUpdateLead = false;
 

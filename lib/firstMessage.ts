@@ -13,8 +13,8 @@ export async function sendFirstMessage(lead: Lead, agentProfile: AgentProfile): 
     return { success: false, reason: 'No consent provided' };
   }
 
-  const agentName = agentProfile.name || 'Sachin Bhoir';
-  const agencyName = agentProfile.agencyName || 'One Stop Property Solutions';
+  const agentName = agentProfile.name || 'Sales Advisor';
+  const agencyName = agentProfile.agencyName || 'Real Estate Advisors';
 
   const systemPrompt = `You are a professional real estate assistant working for ${agentName} at ${agencyName} in India.
 Your goal is to write a warm, single-line opening WhatsApp greeting to a new lead named ${lead.name || 'there'}.

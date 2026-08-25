@@ -66,7 +66,7 @@ export async function getVisits(): Promise<SiteVisit[]> {
 export async function updateVisit(id: string, updates: Partial<SiteVisit>): Promise<void> {
   if (isFirebaseConfigured() && adminDb) {
     try {
-      await adminDb.collection(VISITS_COLLECTION).doc(id).update(updates);
+      await adminDb.collection(VISITS_COLLECTION).doc(id).set(updates, { merge: true });
       return;
     } catch (error) {
       console.warn('[Firestore] Failed to update visit in Firebase:', error);

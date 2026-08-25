@@ -5,10 +5,17 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
-    const folder = (formData.get('folder') as string) || 'brochures';
+    const rawFolder = (formData.get('folder') as string) || 'brochures';
+    const folder = rawFolder.replace(/[^a-zA-Z0-9_-]/g, '') || 'brochures';
 
     if (!file) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
+    }
+
+    // Limit maximum upload size to 50MB
+    const MAX_SIZE = 50 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      return NextResponse.json({ error: 'File size exceeds maximum allowed limit (50MB)' }, { status: 413 });
     }
 
     const arrayBuffer = await file.arrayBuffer();

@@ -3,16 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { 
-  DocumentDuplicateIcon, 
-  CheckIcon, 
   SparklesIcon, 
-  CommandLineIcon, 
-  HeartIcon, 
   CpuChipIcon, 
-  GlobeAltIcon,
   ArrowPathIcon,
   CheckCircleIcon,
-  ExclamationTriangleIcon
+  CheckIcon,
+  PlusIcon,
+  TrashIcon,
+  SpeakerXMarkIcon
 } from '@heroicons/react/24/outline';
 import { AgentProfile } from '@/lib/types';
 
@@ -31,119 +29,53 @@ const PROMPT_TEMPLATES = [
   },
   {
     title: '📍 Locality Priority',
-    text: 'If the lead does not specify a location, immediately recommend our prime gated community projects in Whitefield and Sarjapur Road.'
+    text: 'If the lead does not specify a location, immediately recommend our prime projects in top metro hubs and suburban corridors.'
   }
 ];
 
 export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-  const [activeTab, setActiveTab] = useState<'ai' | 'integrations' | 'health'>('ai');
-  const [copiedUrl, setCopiedUrl] = useState(false);
-  const [copiedWaUrl, setCopiedWaUrl] = useState(false);
-  const [copiedToken, setCopiedToken] = useState(false);
-  const [isLaunchingMeta, setIsLaunchingMeta] = useState(false);
-  const [metaAuthStatus, setMetaAuthStatus] = useState<string | null>(null);
-
+  const [activeTab, setActiveTab] = useState<'ai' | 'excluded' | 'health'>('ai');
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
+  const [newNumberInput, setNewNumberInput] = useState('');
+
   const [profile, setProfile] = useState<Partial<AgentProfile>>({
-    name: 'Sachin Bhoir',
-    agencyName: 'One Stop Property Solutions',
-    phone: '+919876543210',
+    name: '',
+    agencyName: '',
+    phone: '',
+    email: '',
+    officeAddress: '',
     tone: 'friendly',
     languagePreference: 'hinglish',
     customInstructions: '',
+    savedNumbers: [],
   });
 
   const [healthData, setHealthData] = useState<any>(null);
   const [loadingHealth, setLoadingHealth] = useState(false);
 
-  const webhookUrl = typeof window !== 'undefined' 
-    ? `${window.location.origin}/api/integrations/facebook`
-    : 'https://leadpilot-liard.vercel.app/api/integrations/facebook';
-
-  const waWebhookUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/api/whatsapp/webhook`
-    : 'https://leadpilot-liard.vercel.app/api/whatsapp/webhook';
-
-  const verifyToken = 'leadpilot_webhook_token';
-
-  const launchMetaEmbeddedSignup = () => {
-    setIsLaunchingMeta(true);
-    setMetaAuthStatus(null);
-
-    // Ensure FB SDK is loaded
-    if (typeof window !== 'undefined') {
-      const loadAndLaunch = () => {
-        if ((window as any).FB) {
-          (window as any).FB.init({
-            appId: '2227816574724553',
-            cookie: true,
-            xfbml: true,
-            version: 'v20.0'
-          });
-
-          (window as any).FB.login(
-            (response: any) => {
-              setIsLaunchingMeta(false);
-              if (response.authResponse) {
-                setMetaAuthStatus('✅ Connected to Meta! Phone number registered.');
-              } else {
-                setMetaAuthStatus('Popup closed or cancelled.');
-              }
-            },
-            {
-              config_id: '1930273901003382',
-              response_type: 'code',
-              override_default_response_type: true
-            }
-          );
-        } else {
-          // Dynamically inject FB SDK script
-          const script = document.createElement('script');
-          script.src = 'https://connect.facebook.net/en_US/sdk.js';
-          script.async = true;
-          script.defer = true;
-          script.onload = () => {
-            (window as any).FB.init({
-              appId: '2227816574724553',
-              cookie: true,
-              xfbml: true,
-              version: 'v20.0'
-            });
-            (window as any).FB.login(
-              (response: any) => {
-                setIsLaunchingMeta(false);
-                if (response.authResponse) {
-                  setMetaAuthStatus('✅ Connected to Meta! Phone number registered.');
-                }
-              },
-              {
-                config_id: '1930273901003382',
-                response_type: 'code',
-                override_default_response_type: true
-              }
-            );
-          };
-          document.body.appendChild(script);
-        }
-      };
-
-      loadAndLaunch();
+  useEffect(() => {
+    if (isOpen) {
+      fetchProfile();
+      fetchHealth();
     }
-  };
+  }, [isOpen]);
 
-  const fetchSettings = async () => {
+  const fetchProfile = async () => {
     setLoadingProfile(true);
     try {
       const res = await fetch('/api/settings');
-      const json = await res.json();
-      if (json.success && json.data) {
-        setProfile(json.data);
+      const data = await res.json();
+      if (data.success && data.data) {
+        setProfile({
+          ...data.data,
+          savedNumbers: Array.isArray(data.data.savedNumbers) ? data.data.savedNumbers : []
+        });
       }
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      console.error('Failed to load profile:', error);
     } finally {
       setLoadingProfile(false);
     }
@@ -153,24 +85,17 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
     setLoadingHealth(true);
     try {
       const res = await fetch('/api/health');
-      const json = await res.json();
-      setHealthData(json);
-    } catch (e) {
-      console.error(e);
+      const data = await res.json();
+      setHealthData(data);
+    } catch (error) {
+      console.error('Failed to load health:', error);
     } finally {
       setLoadingHealth(false);
     }
   };
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchSettings();
-      fetchHealth();
-    }
-  }, [isOpen]);
-
-  const handleSaveProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveProfile = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setSavingProfile(true);
     setSavedSuccess(false);
 
@@ -178,32 +103,48 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
       const res = await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(profile)
+        body: JSON.stringify(profile),
       });
-      const json = await res.json();
-      if (json.success) {
+      const data = await res.json();
+      if (data.success) {
         setSavedSuccess(true);
-        setTimeout(() => setSavedSuccess(false), 2500);
-      } else {
-        alert('Failed to save settings: ' + json.error);
+        setTimeout(() => setSavedSuccess(false), 3000);
       }
-    } catch (e) {
-      console.error(e);
-      alert('Error saving settings');
+    } catch (error) {
+      console.error('Failed to save settings:', error);
     } finally {
       setSavingProfile(false);
     }
   };
 
-  const copyToClipboard = (text: string, isToken = false) => {
-    navigator.clipboard.writeText(text);
-    if (isToken) {
-      setCopiedToken(true);
-      setTimeout(() => setCopiedToken(false), 2000);
-    } else {
-      setCopiedUrl(true);
-      setTimeout(() => setCopiedUrl(false), 2000);
+  const handleAddExcludedNumber = () => {
+    const raw = newNumberInput.trim().replace(/[^0-9+]/g, '');
+    if (!raw) return;
+
+    const currentList = Array.isArray(profile.savedNumbers) ? profile.savedNumbers : [];
+    if (!currentList.includes(raw)) {
+      const updated = [...currentList, raw];
+      setProfile(prev => ({ ...prev, savedNumbers: updated }));
+      setNewNumberInput('');
+      // Auto save
+      fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...profile, savedNumbers: updated }),
+      });
     }
+  };
+
+  const handleRemoveExcludedNumber = (numToRemove: string) => {
+    const currentList = Array.isArray(profile.savedNumbers) ? profile.savedNumbers : [];
+    const updated = currentList.filter(n => n !== numToRemove);
+    setProfile(prev => ({ ...prev, savedNumbers: updated }));
+    // Auto save
+    fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...profile, savedNumbers: updated }),
+    });
   };
 
   const insertPromptTemplate = (text: string) => {
@@ -233,6 +174,18 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
           </button>
 
           <button
+            onClick={() => setActiveTab('excluded')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              activeTab === 'excluded' 
+                ? 'bg-claude-accent text-white shadow-sm' 
+                : 'text-claude-muted hover:text-white'
+            }`}
+          >
+            <SpeakerXMarkIcon className="w-4 h-4" />
+            <span>🔇 Saved Numbers ({profile.savedNumbers?.length || 0})</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('health')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
               activeTab === 'health' 
@@ -255,16 +208,17 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
                 : 'bg-rose-950/40 border-rose-500/40 text-rose-300'
             }`}>
               <div>
-                <h4 className="text-xs font-bold flex items-center gap-1.5">
-                  <span className={`w-2 h-2 rounded-full ${profile.aiEnabled !== false ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`} />
-                  Master AI Operations Switch: {profile.aiEnabled !== false ? 'ACTIVE (24/7 Autopilot)' : 'PAUSED (Manual Mode)'}
-                </h4>
-                <p className="text-[11px] text-claude-muted mt-0.5">
+                <div className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${profile.aiEnabled !== false ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
+                  {profile.aiEnabled !== false ? 'AI Agent Status: Active & Responding' : 'AI Agent Status: Manual Mode (Stopped)'}
+                </div>
+                <div className="text-[11px] text-claude-muted mt-0.5">
                   {profile.aiEnabled !== false
-                    ? 'AI is actively qualifying leads and negotiating on WhatsApp.'
-                    : 'All AI responses are halted. Leads are held for manual agent replies.'}
-                </p>
+                    ? 'AI automatically qualifies incoming leads 24/7 in 1 line.'
+                    : 'AI auto-replies are paused globally. Human agent handles chats.'}
+                </div>
               </div>
+
               <button
                 type="button"
                 onClick={() => setProfile({ ...profile, aiEnabled: profile.aiEnabled === false })}
@@ -285,7 +239,7 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
                   value={profile.name || ''} 
                   onChange={e => setProfile({ ...profile, name: e.target.value })}
                   className="w-full bg-claude-bg border border-claude-border rounded-lg px-3 py-2 text-xs text-claude-text focus:outline-none focus:ring-1 focus:ring-claude-accent" 
-                  placeholder="Sachin Bhoir"
+                  placeholder="e.g. Rahul Sharma"
                 />
               </div>
 
@@ -295,7 +249,27 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
                   value={profile.agencyName || ''} 
                   onChange={e => setProfile({ ...profile, agencyName: e.target.value })}
                   className="w-full bg-claude-bg border border-claude-border rounded-lg px-3 py-2 text-xs text-claude-text focus:outline-none focus:ring-1 focus:ring-claude-accent" 
-                  placeholder="One Stop Property Solutions"
+                  placeholder="e.g. Ragnor Real Estate"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted mb-1">Office Contact Phone</label>
+                <input 
+                  value={profile.phone || ''} 
+                  onChange={e => setProfile({ ...profile, phone: e.target.value })}
+                  className="w-full bg-claude-bg border border-claude-border rounded-lg px-3 py-2 text-xs text-claude-text focus:outline-none focus:ring-1 focus:ring-claude-accent" 
+                  placeholder="+91 98765 43210"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-claude-muted mb-1">Office Address</label>
+                <input 
+                  value={profile.officeAddress || ''} 
+                  onChange={e => setProfile({ ...profile, officeAddress: e.target.value })}
+                  className="w-full bg-claude-bg border border-claude-border rounded-lg px-3 py-2 text-xs text-claude-text focus:outline-none focus:ring-1 focus:ring-claude-accent" 
+                  placeholder="Shop 101, Business Towers"
                 />
               </div>
 
@@ -383,6 +357,68 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
           </form>
         )}
 
+        {/* TAB 2: SAVED & EXCLUDED NUMBERS (DO NOT REPLY LIST) */}
+        {activeTab === 'excluded' && (
+          <div className="space-y-4 animate-in fade-in duration-300">
+            <div className="bg-claude-bg p-4 rounded-xl border border-claude-border space-y-2">
+              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                <SpeakerXMarkIcon className="w-4 h-4 text-amber-400" />
+                <span>Saved & Excluded Numbers (Do-Not-Reply Protection)</span>
+              </h3>
+              <p className="text-xs text-claude-muted leading-relaxed">
+                Add personal numbers, partners, friends, or VIP clients here. 
+                When any of these numbers message you on WhatsApp, their messages will be <strong>saved in your history</strong> for your review, but the <strong>AI will NEVER auto-reply</strong> to them.
+              </p>
+            </div>
+
+            {/* Add Number Input */}
+            <div className="flex gap-2">
+              <input 
+                type="text"
+                value={newNumberInput}
+                onChange={e => setNewNumberInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddExcludedNumber(); } }}
+                placeholder="Enter phone number (e.g. +91 98765 43210 or 9876543210)..."
+                className="flex-1 bg-claude-bg border border-claude-border rounded-lg px-3 py-2 text-xs text-claude-text focus:outline-none focus:ring-1 focus:ring-claude-accent font-mono"
+              />
+              <button
+                type="button"
+                onClick={handleAddExcludedNumber}
+                className="bg-claude-accent hover:bg-claude-accent/90 text-white px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
+              >
+                <PlusIcon className="w-3.5 h-3.5" />
+                <span>Add Number</span>
+              </button>
+            </div>
+
+            {/* List of Excluded Numbers */}
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {!profile.savedNumbers || profile.savedNumbers.length === 0 ? (
+                <div className="text-center py-6 text-xs text-claude-muted border border-dashed border-claude-border rounded-xl">
+                  No saved numbers yet. The AI is enabled for all new inbound leads.
+                </div>
+              ) : (
+                profile.savedNumbers.map((num, idx) => (
+                  <div key={idx} className="flex items-center justify-between bg-claude-bg px-3 py-2 rounded-lg border border-claude-border text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-400" />
+                      <span className="font-mono text-claude-text font-medium">{num}</span>
+                      <span className="text-[10px] text-claude-muted bg-claude-card px-2 py-0.5 rounded border border-claude-border">AI Muted</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveExcludedNumber(num)}
+                      className="text-claude-muted hover:text-rose-400 p-1 transition-colors"
+                      title="Remove from excluded list"
+                    >
+                      <TrashIcon className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
 
         {/* TAB 3: SYSTEM HEALTH & DIAGNOSTICS */}
         {activeTab === 'health' && (
@@ -411,7 +447,7 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
                     <span className="text-xs font-semibold text-white">{healthData.services?.database?.provider}</span>
                   </div>
                   <div className="text-[10px] text-claude-muted mt-1">
-                    {healthData.services?.database?.status.includes('production') ? 'Live Google Cloud Firestore' : 'Dual-Mode Stateful Simulation Active'}
+                    {healthData.services?.database?.status.includes('production') ? 'Live Google Cloud Firestore (ragnor-79342)' : 'Dual-Mode Stateful Simulation Active'}
                   </div>
                 </div>
 
@@ -441,7 +477,7 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
                   <div className="text-xs text-claude-muted mb-1">Production Readiness</div>
                   <div className="flex items-center gap-2">
                     <div className={`w-2 h-2 rounded-full ${healthData.productionReady ? 'bg-green-400' : 'bg-emerald-400'}`} />
-                    <span className="text-xs font-semibold text-white">Operational (Zero Crash)</span>
+                    <span className="text-xs font-semibold text-white">Operational (Live Firestore & Groq)</span>
                   </div>
                   <div className="text-[10px] text-claude-muted mt-1">
                     Environment: {healthData.environment}

@@ -49,3 +49,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: 'Failed to create lead' }, { status: 500 });
   }
 }
+
+export async function PATCH(request: Request) {
+  try {
+    const { id, ...updates } = await request.json();
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'Missing lead ID' }, { status: 400 });
+    }
+    const { updateLead } = await import('@/lib/firestore/leads');
+    await updateLead(id, updates);
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error('Error updating lead:', error);
+    return NextResponse.json({ success: false, error: error.message || 'Failed to update lead' }, { status: 500 });
+  }
+}

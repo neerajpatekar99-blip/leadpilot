@@ -19,14 +19,25 @@
 # misc
 .DS_Store
 *.pem
+*.key
+*.cert
+serviceAccountKey*.json
+service-account*.json
+firebase-adminsdk*.json
 
-# debug
+# debug & logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+*.log
 
 # local env files
+.env
 .env*.local
+.env.development.local
+.env.test.local
+.env.production.local
+!.env.local.example
 
 # vercel
 .vercel
@@ -38,3 +49,4 @@ next-env.d.ts
 # scratch test scripts & auth sessions
 scratch/
 whatsapp_auth_info/
+.agents/

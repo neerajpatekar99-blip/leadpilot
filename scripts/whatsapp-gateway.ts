@@ -11,7 +11,7 @@ import * as path from 'path';
 import QRCode from 'qrcode';
 import { getLeadByPhone, createLead, saveMessage, getConversation, updateLead } from '../lib/firestore/leads';
 import { generateAIResponse } from '../lib/groq';
-import { getAgentProfile } from '../lib/firestore/agent';
+import { getAgentProfile, isNumberExcluded } from '../lib/firestore/agent';
 import { findMatchingProperties } from '../lib/firestore/properties';
 import { createTask } from '../lib/firestore/tasks';
 import { createVisit } from '../lib/firestore/visits';
@@ -28,7 +28,7 @@ server.listen(PORT, () => {
   console.log(`🌐 Healthcheck HTTP server listening on port ${PORT}`);
 });
 
-const TARGET_PHONE = process.env.WHATSAPP_LINK_PHONE || '919870178204'; // Sachin Sir's number
+const TARGET_PHONE = process.env.WHATSAPP_LINK_PHONE || '';
 const AUTH_DIR = path.resolve(__dirname, '../whatsapp_auth_info');
 
 
@@ -37,11 +37,11 @@ const recentMessagesCache = new Map<string, Message[]>();
 const leadsCache = new Map<string, Lead>();
 let cachedAgentProfile: AgentProfile = {
   id: 'default_agent',
-  name: 'Sachin Bhoir',
-  agencyName: 'One Stop Property Solutions',
+  name: 'Real Estate Advisor',
+  agencyName: 'Prime Property Solutions',
   phone: '+919876543210',
   specializations: ['Residential 1BHK/2BHK/3BHK', 'Commercial', 'Plots'],
-  activeLocalities: ['Kharghar', 'Navi Mumbai', 'Panvel', 'Thane'],
+  activeLocalities: ['City Center', 'Metro Corridor', 'Suburbs'],
   tone: 'friendly',
   languagePreference: 'hinglish',
   customInstructions: '1. Only discuss real estate: properties, pricing, localities, site visits, buying, selling, renting.\n2. Keep responses to ONE line without dashes.\n3. Escalate only for confirmed site visit booking or token payments.',
@@ -141,7 +141,7 @@ async function startWhatsAppGateway() {
       setTimeout(() => startWhatsAppGateway(), 3000);
     } else if (connection === 'open') {
       console.log('\n======================================================');
-      console.log('✅ WHATSAPP CONNECTED & LIVE! Sachin Sir is linked! 🚀');
+      console.log('✅ WHATSAPP CONNECTED & LIVE! Gateway is linked! 🚀');
       console.log('======================================================\n');
     }
   });
@@ -209,9 +209,15 @@ async function startWhatsAppGateway() {
         const leadMsg: Message = { id: `m-${Date.now()}-1`, leadId: lead.id, role: 'lead', content: messageText, timestamp: Date.now() };
         saveMessage(lead.id, leadMsg).catch(() => {});
 
-        // 3. Check Master AI Killswitch in memory
+        // 3. Check Master AI Killswitch and Saved/Excluded Numbers
         if (cachedAgentProfile.aiEnabled === false) {
           console.log(`🛑 Master AI Killswitch is active (Manual Mode). Recorded message from ${pushName} but skipped auto-reply.`);
+          sock.sendPresenceUpdate('paused', remoteJid).catch(() => {});
+          continue;
+        }
+
+        if (isNumberExcluded(rawPhone, cachedAgentProfile, lead)) {
+          console.log(`🔇 Saved/Excluded Number (+${rawPhone}). Recorded message from ${pushName} but skipped AI auto-reply.`);
           sock.sendPresenceUpdate('paused', remoteJid).catch(() => {});
           continue;
         }

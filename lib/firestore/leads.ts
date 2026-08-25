@@ -113,7 +113,7 @@ export async function getLeadByPhone(phone: string): Promise<Lead | null> {
 export async function updateLead(id: string, updates: Partial<Lead>): Promise<void> {
   if (isFirebaseConfigured() && adminDb) {
     try {
-      await adminDb.collection(LEADS_COLLECTION).doc(id).update(updates);
+      await adminDb.collection(LEADS_COLLECTION).doc(id).set(updates, { merge: true });
       return;
     } catch (error) {
       console.warn('[Firestore] Failed to update lead in Firebase:', error);
@@ -129,9 +129,9 @@ export async function updateLead(id: string, updates: Partial<Lead>): Promise<vo
 export async function deleteLead(id: string): Promise<void> {
   if (isFirebaseConfigured() && adminDb) {
     try {
-      await adminDb.collection(LEADS_COLLECTION).doc(id).update({
+      await adminDb.collection(LEADS_COLLECTION).doc(id).set({
         deletedAt: Date.now()
-      });
+      }, { merge: true });
       return;
     } catch (error) {
       console.warn('[Firestore] Failed to delete lead in Firebase:', error);

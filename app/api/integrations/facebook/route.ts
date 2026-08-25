@@ -31,7 +31,10 @@ export async function POST(request: Request) {
     const hmac = crypto.createHmac('sha256', secret);
     const digest = 'sha256=' + hmac.update(rawBody).digest('hex');
 
-    if (signature !== digest) {
+    const sigBuffer = Buffer.from(signature);
+    const digestBuffer = Buffer.from(digest);
+
+    if (sigBuffer.length !== digestBuffer.length || !crypto.timingSafeEqual(sigBuffer, digestBuffer)) {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 403 });
     }
 

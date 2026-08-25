@@ -17,8 +17,12 @@ export async function POST(req: Request) {
       try {
         const lead = await getLeadById(leadId);
         if (lead && lead.phone && lead.consentStatus === 'opted_in') {
-          // Replace personalization tokens if any, e.g. {name}
-          const personalizedMessage = message.replace('{name}', lead.name);
+          // Replace personalization tokens across all occurrences
+          const personalizedMessage = message
+            .replaceAll('{name}', lead.name || 'there')
+            .replaceAll('{locality}', lead.locality || '')
+            .replaceAll('{budget}', lead.budget || '')
+            .replaceAll('{propertyType}', lead.propertyType || lead.configuration || '');
           
           await sendWhatsAppMessage(lead.phone, personalizedMessage);
           

@@ -24,6 +24,9 @@ export async function POST(req: NextRequest) {
     let extractedText = directText || '';
 
     if (file) {
+      if (file.size > 25 * 1024 * 1024) {
+        return NextResponse.json({ error: 'File exceeds maximum 25MB limit' }, { status: 413 });
+      }
       const buffer = Buffer.from(await file.arrayBuffer());
       const fileName = file.name.toLowerCase();
 

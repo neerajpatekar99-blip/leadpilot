@@ -151,7 +151,7 @@ export function LeadTable({ leads, loading, onViewChat, onSendWhatsApp, selected
           </thead>
           <tbody className="bg-claude-card divide-y divide-claude-border">
             {leads.map(lead => (
-              <tr key={lead.id} className={`hover:bg-gray-50 transition-colors ${lead.aiStatus === 'needs_agent' ? 'bg-red-50/30' : ''}`}>
+              <tr key={lead.id} className={`hover:bg-claude-bg/60 transition-colors ${lead.aiStatus === 'needs_agent' ? 'bg-red-950/20' : ''}`}>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <input 
                     type="checkbox" 
@@ -161,8 +161,15 @@ export function LeadTable({ leads, loading, onViewChat, onSendWhatsApp, selected
                   />
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="font-medium text-claude-text">{lead.name}</div>
-                  <div className="text-sm text-claude-muted mt-1">{lead.phone}</div>
+                  <div className="font-medium text-claude-text flex items-center gap-1.5">
+                    <span>{lead.name}</span>
+                    {(lead.doNotReply || lead.aiStatus === 'agent_took_over') && (
+                      <span className="text-[10px] bg-amber-500/10 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded font-mono">
+                        🔇 Saved
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-sm text-claude-muted mt-1 font-mono">{lead.phone}</div>
                   {lead.email && <div className="text-xs text-gray-400 mt-0.5">{lead.email}</div>}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -191,7 +198,7 @@ export function LeadTable({ leads, loading, onViewChat, onSendWhatsApp, selected
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <Badge color={getAiStatusColor(lead.aiStatus)} pulse={lead.aiStatus === 'needs_agent'}>
-                    {lead.aiStatus.replace(/_/g, ' ')}
+                    {lead.aiStatus === 'agent_took_over' ? 'Agent (Muted)' : lead.aiStatus.replace(/_/g, ' ')}
                   </Badge>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-claude-muted">

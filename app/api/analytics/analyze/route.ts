@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getLeadById, getConversation, updateLead } from '@/lib/firestore/leads';
+import { getAgentProfile } from '@/lib/firestore/agent';
 import { generateLeadIntelligence } from '@/lib/groq';
 import { createTask } from '@/lib/firestore/tasks';
 import { createVisit } from '@/lib/firestore/visits';
@@ -18,9 +19,10 @@ export async function POST(req: Request) {
     }
 
     const conversation = await getConversation(leadId);
+    const agentProfile = await getAgentProfile();
     
     // Call Groq to summarize and score the lead based on conversation
-    const intelligence = await generateLeadIntelligence(lead, conversation);
+    const intelligence = await generateLeadIntelligence(lead, conversation, agentProfile?.name);
 
     // Update the lead in Firestore
     await updateLead(leadId, {

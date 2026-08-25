@@ -1,31 +1,123 @@
 "use client";
-import React from 'react';
+import React, { useState } from 'react';
 import useSWR from 'swr';
 import { Lead, Message } from '@/lib/types';
 import { Badge } from '@/components/ui/Badge';
-import { ArrowPathIcon, UserIcon, MapPinIcon, BanknotesIcon, ClockIcon, CheckBadgeIcon } from '@heroicons/react/24/outline';
+import { 
+  ArrowPathIcon, 
+  UserIcon, 
+  MapPinIcon, 
+  BanknotesIcon, 
+  ClockIcon, 
+  CheckBadgeIcon,
+  PaperAirplaneIcon,
+  SpeakerWaveIcon,
+  SpeakerXMarkIcon
+} from '@heroicons/react/24/outline';
 
 const fetcher = (url: string) => fetch(url).then(res => res.json()).then(data => data.data);
 
-export function ConversationView({ lead }: { lead: Lead }) {
+export function ConversationView({ lead, onLeadUpdated }: { lead: Lead; onLeadUpdated?: () => void }) {
   const { data: messages, error, mutate } = useSWR<Message[]>(
     lead?.id ? `/api/chat?leadId=${lead.id}` : null, 
     fetcher, 
     { refreshInterval: 3000, fallbackData: [] }
   );
 
+  const [manualMessage, setManualMessage] = useState('');
+  const [sendingManual, setSendingManual] = useState(false);
+  const [togglingAi, setTogglingAi] = useState(false);
+  const [localAiStatus, setLocalAiStatus] = useState(lead.aiStatus);
+
+  const isMuted = localAiStatus === 'agent_took_over' || lead.doNotReply;
   const loading = !messages && !error;
+
+  const handleToggleMute = async () => {
+    setTogglingAi(true);
+    const newStatus = isMuted ? 'ai_handling' : 'agent_took_over';
+    try {
+      await fetch('/api/leads', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: lead.id,
+          aiStatus: newStatus,
+          doNotReply: !isMuted,
+        })
+      });
+      setLocalAiStatus(newStatus);
+      if (onLeadUpdated) onLeadUpdated();
+    } catch (err) {
+      console.error('Failed to toggle AI status:', err);
+    } finally {
+      setTogglingAi(false);
+    }
+  };
+
+  const handleSendManual = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualMessage.trim() || sendingManual) return;
+
+    setSendingManual(true);
+    try {
+      const res = await fetch('/api/whatsapp/takeover', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: lead.id,
+          phone: lead.phone,
+          message: manualMessage.trim(),
+        })
+      });
+
+      if (res.ok) {
+        setManualMessage('');
+        setLocalAiStatus('agent_took_over');
+        mutate();
+        if (onLeadUpdated) onLeadUpdated();
+      }
+    } catch (err) {
+      console.error('Failed to send manual message:', err);
+    } finally {
+      setSendingManual(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
-      {/* Sachin Sir's Qualification Profile Card */}
+      {/* AI Qualification Profile Card */}
       <div className="bg-claude-bg p-4 rounded-xl border border-claude-border space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-claude-border pb-3">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-claude-text">{lead.name}</span>
             <span className="text-xs text-claude-muted font-mono">{lead.phone}</span>
           </div>
+
           <div className="flex items-center gap-2">
+            {/* 1-Click Saved Number / AI Auto-Reply Mute Toggle */}
+            <button
+              onClick={handleToggleMute}
+              disabled={togglingAi}
+              title={isMuted ? "Click to resume AI auto-replies" : "Click to mark as saved/personal number and mute AI auto-replies"}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
+                isMuted 
+                  ? 'bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20' 
+                  : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20'
+              }`}
+            >
+              {isMuted ? (
+                <>
+                  <SpeakerXMarkIcon className="w-3.5 h-3.5 text-amber-400" />
+                  <span>🔇 Saved (AI Muted)</span>
+                </>
+              ) : (
+                <>
+                  <SpeakerWaveIcon className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>🤖 AI Handling</span>
+                </>
+              )}
+            </button>
+
             {lead.leadScore && (
               <Badge color={lead.leadScore === 'Hot' ? 'red' : lead.leadScore === 'Warm' ? 'yellow' : 'gray'}>
                 {lead.leadScore} Intent
@@ -93,7 +185,7 @@ export function ConversationView({ lead }: { lead: Lead }) {
       </div>
 
       {/* Live Conversation Stream */}
-      <div className="flex flex-col h-80 bg-claude-bg rounded-xl p-4 overflow-y-auto space-y-3 border border-claude-border">
+      <div className="flex flex-col h-72 bg-claude-bg rounded-xl p-4 overflow-y-auto space-y-3 border border-claude-border">
         {loading ? (
           <div className="flex justify-center items-center py-12 text-claude-muted">
             <ArrowPathIcon className="w-6 h-6 animate-spin" />
@@ -123,6 +215,25 @@ export function ConversationView({ lead }: { lead: Lead }) {
           ))
         )}
       </div>
+
+      {/* Manual Agent Reply Composer */}
+      <form onSubmit={handleSendManual} className="flex gap-2">
+        <input 
+          type="text"
+          value={manualMessage}
+          onChange={e => setManualMessage(e.target.value)}
+          placeholder={isMuted ? "Type a manual reply (AI is muted for this contact)..." : "Reply manually as Agent (switches to human takeover)..."}
+          className="flex-1 bg-claude-card border border-claude-border rounded-xl px-3.5 py-2.5 text-xs text-claude-text focus:outline-none focus:ring-1 focus:ring-claude-accent"
+        />
+        <button
+          type="submit"
+          disabled={!manualMessage.trim() || sendingManual}
+          className="bg-claude-accent hover:bg-claude-accent/90 disabled:opacity-50 text-white px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
+        >
+          {sendingManual ? <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" /> : <PaperAirplaneIcon className="w-3.5 h-3.5" />}
+          <span>Send</span>
+        </button>
+      </form>
     </div>
   );
 }

@@ -10,7 +10,7 @@ export interface Lead {
   createdAt: number;
   lastContactedAt?: number;
   notes?: string;
-  // CRM AI & Qualification Fields (Sachin Sir Questionnaire)
+  // CRM AI & Qualification Fields (Real Estate Qualification Flow)
   aiSummary?: string;
   leadScore?: 'Hot' | 'Warm' | 'Cold' | 'Unscored';
   intent?: 'buy' | 'rent' | 'sell' | 'invest';
@@ -24,6 +24,7 @@ export interface Lead {
   isDecisionMaker?: 'yes' | 'no' | 'joint';
   hasOtherBroker?: 'yes' | 'no';
   preferredContact?: 'whatsapp' | 'call' | 'email';
+  doNotReply?: boolean;
   deletedAt?: number;
 }
 
@@ -90,5 +91,6 @@ export interface AgentProfile {
   tone?: 'friendly' | 'professional' | 'luxury' | 'casual' | 'custom';
   languagePreference?: 'hinglish' | 'english' | 'hindi' | 'auto';
   aiEnabled?: boolean;
+  savedNumbers?: string[];
   updatedAt?: number;
 }

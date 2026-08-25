@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getLeadByPhone, createLead, saveMessage } from '@/lib/firestore/leads';
-import { getAgentProfile } from '@/lib/firestore/agent';
+import { getAgentProfile, isNumberExcluded } from '@/lib/firestore/agent';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -68,18 +68,21 @@ export async function POST(request: Request) {
         });
       }
 
-      // Fetch Agent Profile to check Master AI Killswitch
+      // Fetch Agent Profile to check Master AI Killswitch and Excluded Numbers list
       const agentProfile = await getAgentProfile();
       const isAiPausedGlobally = agentProfile.aiEnabled === false;
+      const isExcluded = isNumberExcluded(phone, agentProfile, lead);
 
-      if (isAiPausedGlobally || lead.aiStatus === 'agent_took_over') {
-        // Master AI is Stopped or Agent Took Over: Record message only, do NOT auto-reply
+      if (isAiPausedGlobally || isExcluded) {
+        // Master AI is Stopped, Agent Took Over, or Number is in Saved/Excluded List:
+        // Record incoming message in history, but do NOT auto-reply.
         await saveMessage(lead.id, {
           leadId: lead.id,
           role: 'lead',
           content: text,
           timestamp: Date.now(),
         });
+        console.log(`🔇 [Webhook] Message saved for excluded/saved contact (+${phone}), AI auto-reply suppressed.`);
       } else {
         // Forward to our chat API internally
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';

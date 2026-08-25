@@ -4,7 +4,15 @@ import React from 'react';
 import { Property } from '@/lib/types';
 import { PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline';
 
-export default function PropertyTable({ properties }: { properties: Property[] }) {
+export default function PropertyTable({ 
+  properties, 
+  onDelete, 
+  onEdit 
+}: { 
+  properties: Property[]; 
+  onDelete?: (id: string) => void; 
+  onEdit?: (property: Property) => void; 
+}) {
   if (properties.length === 0) {
     return (
       <div className="text-center py-10 text-claude-muted">
@@ -15,6 +23,14 @@ export default function PropertyTable({ properties }: { properties: Property[] }
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumSignificantDigits: 3 }).format(price);
+  };
+
+  const handleDelete = (id: string, title: string) => {
+    if (confirm(`Are you sure you want to remove "${title}" from the catalog?`)) {
+      if (onDelete) {
+        onDelete(id);
+      }
+    }
   };
 
   return (
@@ -59,10 +75,20 @@ export default function PropertyTable({ properties }: { properties: Property[] }
               </td>
               <td className="px-4 py-4 text-right">
                 <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button className="p-1.5 text-claude-muted hover:text-white rounded-md hover:bg-claude-bg">
-                    <PencilSquareIcon className="w-4 h-4" />
-                  </button>
-                  <button className="p-1.5 text-claude-muted hover:text-red-400 rounded-md hover:bg-claude-bg">
+                  {onEdit && (
+                    <button 
+                      onClick={() => onEdit(prop)}
+                      className="p-1.5 text-claude-muted hover:text-white rounded-md hover:bg-claude-bg"
+                      title="Edit property"
+                    >
+                      <PencilSquareIcon className="w-4 h-4" />
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => handleDelete(prop.id, prop.title)}
+                    className="p-1.5 text-claude-muted hover:text-rose-400 rounded-md hover:bg-claude-bg transition-colors"
+                    title="Delete property"
+                  >
                     <TrashIcon className="w-4 h-4" />
                   </button>
                 </div>

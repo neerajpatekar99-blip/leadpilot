@@ -60,7 +60,7 @@ export async function getTasks(): Promise<ActionItem[]> {
 export async function updateTask(id: string, updates: Partial<ActionItem>): Promise<void> {
   if (isFirebaseConfigured() && adminDb) {
     try {
-      await adminDb.collection(TASKS_COLLECTION).doc(id).update(updates);
+      await adminDb.collection(TASKS_COLLECTION).doc(id).set(updates, { merge: true });
       return;
     } catch (error) {
       console.warn('[Firestore] Failed to update task in Firebase:', error);

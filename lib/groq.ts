@@ -35,8 +35,8 @@ export async function generateAIResponse(
   agentProfile: AgentProfile,
   matchingProperties: Property[] = []
 ) {
-  const agentName = agentProfile.name || 'Sachin Bhoir';
-  const agencyName = agentProfile.agencyName || 'One Stop Property Solutions';
+  const agentName = agentProfile.name || 'Sales Advisor';
+  const agencyName = agentProfile.agencyName || 'Real Estate Advisors';
 
   const matchingText = matchingProperties.length > 0 
     ? `AVAILABLE MATCHING PROPERTIES:\n${matchingProperties.slice(0, 1).map(p => `- ${p.title} (${p.propertyType}) in ${p.locality}, Asking Price: ₹${p.priceMax.toLocaleString('en-IN')}, Floor Price: ₹${p.priceMin.toLocaleString('en-IN')}${p.amenities?.length ? `, Amenities: ${p.amenities.slice(0, 3).join(', ')}` : ''}`).join('\n')}`
@@ -46,15 +46,22 @@ export async function generateAIResponse(
     ? `\n═══ AGENCY SPECIFIC DEAL RULES ═══\n${agentProfile.customInstructions.trim()}\n`
     : '';
 
+  const contactParts = [
+    agentProfile.phone ? `📞 Phone: ${agentProfile.phone}` : '',
+    agentProfile.phone ? `📱 WhatsApp: ${agentProfile.phone}` : '',
+    agentProfile.email ? `📧 Email: ${agentProfile.email}` : '',
+    agentProfile.officeAddress ? `📍 Office: ${agentProfile.officeAddress}` : '',
+  ].filter(Boolean).join(' | ') || `📞 Phone: ${agentProfile.phone || 'Contact our office'}`;
+
   const systemPrompt = `You are a professional, warm real estate qualification AI assistant working for ${agentName} at ${agencyName} in India.
 
-═══ PROPERTY ENQUIRY QUALIFICATION FLOW (Sachin Sir's Standard) ═══
+═══ PROPERTY ENQUIRY QUALIFICATION FLOW ═══
 Qualify the buyer naturally one single question at a time across the dialogue:
 1. Basic Intent & Property Type:
    - Intent: Buy, Rent, Sell, or Invest
    - Type: Apartment/Flat (1BHK, 2BHK, 3BHK, 4+BHK), Villa, Plot/Land, Commercial/Office/Shop
 2. Location & Area:
-   - Preferred localities (e.g. Kharghar, Panvel, Ulwe, Navi Mumbai, Thane) or specific developers/projects
+   - Preferred localities (e.g. city localities, suburban sectors) or specific developers/projects
 3. Property Specifications:
    - Furnishing (Furnished/Semi-Furnished), Parking, Balcony, Near Metro, Sea View, etc.
 4. Budget & Home Loan:
@@ -80,7 +87,7 @@ Qualify the buyer naturally one single question at a time across the dialogue:
 2. Progress the conversation forward naturally toward booking a site visit with ${agentName}.
 3. Keep standard conversation replies to ONE single line.
 4. When the lead is qualified, requests direct contact, or books a visit, share ${agentName}'s office details:
-   "📞 Phone: 9870178204 | 📱 WhatsApp: +91 98701 78204 | 📧 Email: sachin@onestoppropertysolution.in | 📍 Office: Shop No. 3, Tulsi Corner, Plot No. 87-88, Sector 21, Kamothe, Navi Mumbai 410209"
+   "${contactParts}"
 5. Never use dashes (hyphens or em dashes). Use commas or full stops instead.
 6. Match the lead's language automatically: Hinglish if Hinglish, Hindi if Hindi, English if English.
 7. Acknowledge what they said warmly before asking the next qualification step.
@@ -172,9 +179,10 @@ You must output a JSON object containing:
   }
 }
 
-export async function generateLeadIntelligence(lead: Lead, conversationHistory: Message[]) {
-  const systemPrompt = `You are an expert real estate CRM intelligence agent for Sachin Bhoir.
-Analyze the entire conversation history with a lead and extract a structured profile following Sachin Sir's qualification questionnaire.
+export async function generateLeadIntelligence(lead: Lead, conversationHistory: Message[], agentName?: string) {
+  const agentDisplayName = agentName?.trim() || 'the real estate agent';
+  const systemPrompt = `You are an expert real estate CRM intelligence agent working for ${agentDisplayName}.
+Analyze the entire conversation history with a lead and extract a structured profile following the qualification questionnaire.
 
 OUTPUT FORMAT:
 Output a JSON object containing:
@@ -190,7 +198,7 @@ Output a JSON object containing:
 - "timeline": Extracted timeline (e.g. "immediate", "1-3 months") or null
 - "isDecisionMaker": "yes" | "no" | "joint" | null
 - "hasOtherBroker": "yes" | "no" | null
-- "actionItems": Array of string tasks the agent needs to do (e.g. ["Call lead to confirm visit", "Send Kharghar 2BHK brochures"])
+- "actionItems": Array of string tasks the agent needs to do (e.g. ["Call lead to confirm visit", "Send property brochures"])
 - "siteVisits": Array of ISO timestamp strings if a site visit was requested
 `;
 
@@ -223,8 +231,9 @@ Output a JSON object containing:
   }
 }
 
-export async function matchPropertyWithLeads(propertyDescription: string, leads: Lead[]) {
-  const systemPrompt = `You are a smart real estate property matcher for Sachin Bhoir.
+export async function matchPropertyWithLeads(propertyDescription: string, leads: Lead[], agentName?: string) {
+  const agentDisplayName = agentName?.trim() || 'the real estate agent';
+  const systemPrompt = `You are a smart real estate property matcher for ${agentDisplayName}.
 Given a Property Description and a list of Leads with their requirements, determine which leads are a good match.
 
 OUTPUT FORMAT:

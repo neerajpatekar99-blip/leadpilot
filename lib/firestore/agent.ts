@@ -6,24 +6,47 @@ const AGENT_DOC_ID = 'agent_profile';
 
 const defaultAgentProfile: AgentProfile = {
   id: 'default_agent',
-  name: 'Sachin Bhoir',
-  agencyName: 'One Stop Property Solutions',
-  phone: '+91 98701 78204',
-  email: 'sachin@onestoppropertysolution.in',
-  officeAddress: 'Shop No. 3, Tulsi Corner, Plot No. 87 88, Sector 21, Kamothe, Navi Mumbai – 410209',
+  name: 'Real Estate Advisor',
+  agencyName: 'Ragnor Real Estate',
+  phone: '+91 98765 43210',
+  email: 'contact@ragnorrealestate.com',
+  officeAddress: 'Shop 101, Business Towers, Prime Hub',
   specializations: ['Residential 1BHK/2BHK/3BHK/4BHK', 'Villas', 'Plots/Land', 'Commercial Shops & Offices'],
-  activeLocalities: ['Kharghar', 'Kamothe', 'Panvel', 'Ulwe', 'Navi Mumbai', 'Thane'],
+  activeLocalities: ['Prime City', 'Suburbs', 'Metro Corridor'],
   tone: 'friendly',
   languagePreference: 'hinglish',
   aiEnabled: true,
+  savedNumbers: [],
   customInstructions: `1. Only discuss real estate: properties, pricing, localities, site visits, buying, selling, renting.
-2. Follow Sachin Sir's 6-step qualification flow naturally.
+2. Follow the standard 6-step qualification flow naturally.
 3. Keep every response strictly to ONE line without dashes.
-4. When lead is fully qualified, requests direct contact, or wants a visit, provide Sachin Sir's office contact details.`,
+4. When lead is fully qualified, requests direct contact, or wants a visit, provide office contact details.`,
   updatedAt: Date.now(),
 };
 
 let memoryAgentProfile: AgentProfile = { ...defaultAgentProfile };
+
+export function normalizePhoneNumber(phone: string): string {
+  if (!phone) return '';
+  const digitsOnly = phone.replace(/[^0-9]/g, '');
+  return digitsOnly.slice(-10);
+}
+
+export function isNumberExcluded(phone: string, profile?: AgentProfile | null, lead?: any): boolean {
+  if (lead?.doNotReply === true || lead?.aiStatus === 'agent_took_over') {
+    return true;
+  }
+  if (!phone || !profile?.savedNumbers?.length) {
+    return false;
+  }
+  const target10 = normalizePhoneNumber(phone);
+  if (!target10) return false;
+
+  return profile.savedNumbers.some(saved => {
+    const saved10 = normalizePhoneNumber(saved);
+    return Boolean(saved10 && saved10 === target10);
+  });
+}
 
 export async function getAgentProfile(): Promise<AgentProfile> {
   if (isFirebaseConfigured() && adminDb) {
@@ -34,6 +57,7 @@ export async function getAgentProfile(): Promise<AgentProfile> {
         return {
           ...defaultAgentProfile,
           ...data,
+          savedNumbers: Array.isArray(data.savedNumbers) ? data.savedNumbers : [],
         };
       } else {
         await adminDb.collection(SETTINGS_COLLECTION).doc(AGENT_DOC_ID).set(defaultAgentProfile);

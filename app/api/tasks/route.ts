@@ -29,3 +29,28 @@ export async function PUT(req: Request) {
     return NextResponse.json({ success: false, error: 'Failed to update task' }, { status: 500 });
   }
 }
+
+export async function PATCH(req: Request) {
+  try {
+    const { id, ...updates } = await req.json();
+    await updateTask(id, updates);
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json({ success: false, error: 'Failed to update task' }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'Missing task id' }, { status: 400 });
+    }
+    const { deleteTask } = await import('@/lib/firestore/tasks');
+    await deleteTask(id);
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json({ success: false, error: 'Failed to delete task' }, { status: 500 });
+  }
+}

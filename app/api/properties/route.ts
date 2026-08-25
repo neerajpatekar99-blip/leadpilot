@@ -24,3 +24,34 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
+
+export async function PATCH(request: Request) {
+  try {
+    const { id, ...updates } = await request.json();
+    if (!id) {
+      return NextResponse.json({ error: 'Missing property id' }, { status: 400 });
+    }
+    const { updateProperty } = await import('@/lib/firestore/properties');
+    const updated = await updateProperty(id, updates);
+    return NextResponse.json({ success: true, property: updated });
+  } catch (error) {
+    console.error('Error updating property:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    if (!id) {
+      return NextResponse.json({ error: 'Missing property id' }, { status: 400 });
+    }
+    const { deleteProperty } = await import('@/lib/firestore/properties');
+    const success = await deleteProperty(id);
+    return NextResponse.json({ success });
+  } catch (error) {
+    console.error('Error deleting property:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
+}

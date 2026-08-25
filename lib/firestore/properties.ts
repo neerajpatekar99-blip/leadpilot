@@ -66,6 +66,11 @@ const initialSeedProperties: Property[] = [
 
 const memoryProperties: Property[] = [...initialSeedProperties];
 
+export function invalidatePropertiesCache(): void {
+  cachedAvailableProperties = [];
+  lastPropsCacheTime = 0;
+}
+
 export async function createProperty(data: Omit<Property, 'id' | 'createdAt'>): Promise<Property> {
   const newProperty: Property = {
     ...data,
@@ -73,6 +78,8 @@ export async function createProperty(data: Omit<Property, 'id' | 'createdAt'>): 
     createdAt: Date.now(),
     status: data.status || 'available',
   };
+
+  invalidatePropertiesCache();
 
   if (isFirebaseConfigured() && adminDb) {
     try {
@@ -148,6 +155,8 @@ export async function updateProperty(id: string, updates: Partial<Property>): Pr
     updatedAt: Date.now(),
   };
 
+  invalidatePropertiesCache();
+
   if (isFirebaseConfigured() && adminDb) {
     try {
       await adminDb.collection(PROPERTIES_COLLECTION).doc(id).set(updated, { merge: true });
@@ -164,12 +173,14 @@ export async function updateProperty(id: string, updates: Partial<Property>): Pr
 }
 
 export async function deleteProperty(id: string): Promise<boolean> {
+  invalidatePropertiesCache();
+
   if (isFirebaseConfigured() && adminDb) {
     try {
-      await adminDb.collection(PROPERTIES_COLLECTION).doc(id).update({
+      await adminDb.collection(PROPERTIES_COLLECTION).doc(id).set({
         status: 'sold',
         updatedAt: Date.now()
-      });
+      }, { merge: true });
       return true;
     } catch (error) {
       console.warn('[Firestore] Failed to soft-delete property in Firebase:', error);
