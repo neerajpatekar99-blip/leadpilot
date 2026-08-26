@@ -15,7 +15,6 @@ import { Lead } from '@/lib/types';
 import AiKillswitchButton from '@/components/ui/AiKillswitchButton';
 import Link from 'next/link';
 import { WhatsAppConnectModal } from '@/components/dashboard/WhatsAppConnectModal';
-import { DeviceLinkQRCard } from '@/components/dashboard/DeviceLinkQRCard';
 import { PlusIcon, Cog6ToothIcon, MagnifyingGlassIcon, UsersIcon, ExclamationCircleIcon, CheckCircleIcon, Squares2X2Icon, ListBulletIcon, LightBulbIcon, ArrowPathIcon, XMarkIcon, BuildingOffice2Icon, ChatBubbleOvalLeftIcon, QrCodeIcon } from '@heroicons/react/24/outline';
 
 const fetcher = (url: string) => fetch(url).then(res => res.json()).then(data => data.data);
@@ -202,17 +201,10 @@ export default function DashboardPage() {
 
         {/* Dashboard Content */}
         <>
-            {/* WhatsApp Device Link & Operational Widgets */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-              {/* WhatsApp AI Agent Device Link QR Card */}
-              <div className="lg:col-span-6 xl:col-span-5">
-                <DeviceLinkQRCard />
-              </div>
-              {/* AI Action Items & Upcoming Visits */}
-              <div className="lg:col-span-6 xl:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4 h-full min-h-[420px]">
-                <TasksWidget />
-                <VisitsWidget />
-              </div>
+            {/* Widgets Section (Tasks & Visits) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[350px]">
+              <TasksWidget />
+              <VisitsWidget />
             </div>
 
             {/* Smart Property Matcher (Global) */}
