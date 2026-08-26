@@ -14,7 +14,9 @@ import { Modal } from '@/components/ui/Modal';
 import { Lead } from '@/lib/types';
 import AiKillswitchButton from '@/components/ui/AiKillswitchButton';
 import Link from 'next/link';
-import { PlusIcon, Cog6ToothIcon, MagnifyingGlassIcon, UsersIcon, ExclamationCircleIcon, CheckCircleIcon, Squares2X2Icon, ListBulletIcon, LightBulbIcon, ArrowPathIcon, XMarkIcon, BuildingOffice2Icon, ChatBubbleOvalLeftIcon } from '@heroicons/react/24/outline';
+import { WhatsAppConnectModal } from '@/components/dashboard/WhatsAppConnectModal';
+import { DeviceLinkQRCard } from '@/components/dashboard/DeviceLinkQRCard';
+import { PlusIcon, Cog6ToothIcon, MagnifyingGlassIcon, UsersIcon, ExclamationCircleIcon, CheckCircleIcon, Squares2X2Icon, ListBulletIcon, LightBulbIcon, ArrowPathIcon, XMarkIcon, BuildingOffice2Icon, ChatBubbleOvalLeftIcon, QrCodeIcon } from '@heroicons/react/24/outline';
 
 const fetcher = (url: string) => fetch(url).then(res => res.json()).then(data => data.data);
 
@@ -45,6 +47,7 @@ export default function DashboardPage() {
   // Modals State
   const [isAddLeadModalOpen, setIsAddLeadModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isWhatsAppConnectOpen, setIsWhatsAppConnectOpen] = useState(false);
   const [selectedLeadForChat, setSelectedLeadForChat] = useState<Lead | null>(null);
   const [selectedLeadForWhatsApp, setSelectedLeadForWhatsApp] = useState<Lead | null>(null);
 
@@ -156,6 +159,14 @@ export default function DashboardPage() {
           </div>
           
           <div className="flex w-full md:w-auto items-center gap-3">
+            <button
+              onClick={() => setIsWhatsAppConnectOpen(true)}
+              className="px-3.5 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-lg text-sm font-medium flex items-center gap-2 transition shadow-sm"
+              title="Connect WhatsApp AI Agent (Live QR & Pairing Code)"
+            >
+              <QrCodeIcon className="w-4 h-4" />
+              <span>WhatsApp QR</span>
+            </button>
             <AiKillswitchButton />
             <button 
               onClick={() => setIsSettingsModalOpen(true)}
@@ -191,10 +202,17 @@ export default function DashboardPage() {
 
         {/* Dashboard Content */}
         <>
-            {/* Widgets Section (Tasks & Visits) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[350px]">
-              <TasksWidget />
-              <VisitsWidget />
+            {/* WhatsApp Device Link & Operational Widgets */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* WhatsApp AI Agent Device Link QR Card */}
+              <div className="lg:col-span-6 xl:col-span-5">
+                <DeviceLinkQRCard />
+              </div>
+              {/* AI Action Items & Upcoming Visits */}
+              <div className="lg:col-span-6 xl:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4 h-full min-h-[420px]">
+                <TasksWidget />
+                <VisitsWidget />
+              </div>
             </div>
 
             {/* Smart Property Matcher (Global) */}
@@ -405,6 +423,11 @@ export default function DashboardPage() {
           />
         )}
       </Modal>
+
+      <WhatsAppConnectModal
+        isOpen={isWhatsAppConnectOpen}
+        onClose={() => setIsWhatsAppConnectOpen(false)}
+      />
     </div>
   );
 }

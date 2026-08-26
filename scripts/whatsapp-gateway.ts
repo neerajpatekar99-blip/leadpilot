@@ -4,11 +4,13 @@ import makeWASocket, {
   DisconnectReason,
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
+  Browsers,
 } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 import QRCode from 'qrcode';
+import qrcodeTerminal from 'qrcode-terminal';
 import { getLeadByPhone, createLead, saveMessage, getConversation, updateLead } from '../lib/firestore/leads';
 import { generateAIResponse } from '../lib/groq';
 import { getAgentProfile, isNumberExcluded } from '../lib/firestore/agent';
@@ -19,17 +21,44 @@ import { AgentProfile, Message, Lead } from '../lib/types';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
 
-const PORT = process.env.PORT || 3000;
-const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('LeadPilot WhatsApp Gateway is Live 24/7!\n');
-});
-server.listen(PORT, () => {
-  console.log(`🌐 Healthcheck HTTP server listening on port ${PORT}`);
-});
+import { adminDb, isFirebaseConfigured } from '../lib/firebase-admin';
+
+const AUTH_DIR = path.resolve(__dirname, '../whatsapp_auth_info');
+
+async function writeStatus(statusData: any) {
+  try {
+    const payload = { ...statusData, updatedAt: Date.now() };
+    const statusFile = path.resolve(AUTH_DIR, 'status.json');
+    if (!fs.existsSync(AUTH_DIR)) fs.mkdirSync(AUTH_DIR, { recursive: true });
+    fs.writeFileSync(statusFile, JSON.stringify(payload, null, 2));
+
+    if (isFirebaseConfigured() && adminDb) {
+      await adminDb.collection('system').doc('whatsapp_session').set(payload, { merge: true });
+    }
+  } catch (err) {
+    console.warn('[Session Sync Warning]:', (err as any)?.message || err);
+  }
+}
+
+// Health check server only if running purely standalone and port is specified
+const isStandalone = process.env.STANDALONE_GATEWAY === 'true';
+if (isStandalone) {
+  const GATEWAY_PORT = process.env.GATEWAY_PORT || 3008;
+  const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('LeadPilot WhatsApp Gateway is Live 24/7!\n');
+  });
+  server.on('error', (err: any) => {
+    console.warn(`[HTTP Server Notice] Port ${GATEWAY_PORT} occupied (${err.code}), running socket in background.`);
+  });
+  try {
+    server.listen(GATEWAY_PORT, () => {
+      console.log(`🌐 Healthcheck HTTP server listening on port ${GATEWAY_PORT}`);
+    });
+  } catch {}
+}
 
 const TARGET_PHONE = process.env.WHATSAPP_LINK_PHONE || '';
-const AUTH_DIR = path.resolve(__dirname, '../whatsapp_auth_info');
 
 
 // In-Memory High Speed Caches (0ms retrieval)
@@ -64,6 +93,10 @@ async function startWhatsAppGateway() {
   console.log('⚡ LEADPILOT AI - ULTRA HIGH SPEED WHATSAPP GATEWAY');
   console.log('======================================================\n');
 
+  if (!fs.existsSync(AUTH_DIR)) {
+    fs.mkdirSync(AUTH_DIR, { recursive: true });
+  }
+
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
   const { version, isLatest } = await fetchLatestBaileysVersion();
   console.log(`Using WhatsApp Web v${version.join('.')}, isLatest: ${isLatest}`);
@@ -71,13 +104,13 @@ async function startWhatsAppGateway() {
   const sock = makeWASocket({
     version,
     logger: pino({ level: 'silent' }),
-    printQRInTerminal: false,
+    printQRInTerminal: true,
     auth: state,
-    browser: ['LeadPilot CRM', 'Chrome', '120.0.0'],
+    browser: Browsers.macOS('Desktop'),
     syncFullHistory: false,
-    connectTimeoutMs: 60000,
-    keepAliveIntervalMs: 25000,
-    defaultQueryTimeoutMs: 60000,
+    connectTimeoutMs: 300000, // 5 minutes connection timeout
+    keepAliveIntervalMs: 10000, // 10 seconds keepalive heartbeat to prevent 408 timeouts
+    defaultQueryTimeoutMs: 300000,
     generateHighQualityLinkPreview: false,
     getMessage: async (key) => {
       return undefined;
@@ -86,6 +119,7 @@ async function startWhatsAppGateway() {
 
   sock.ev.on('creds.update', saveCreds);
 
+  let latestPairingCode = '';
   // If not already registered, generate a Pairing Code with retry loop
   let pairingCodeRequested = false;
   const requestPairing = async (retryCount = 0) => {
@@ -95,38 +129,52 @@ async function startWhatsAppGateway() {
       console.log(`\n⏳ Requesting live WhatsApp Pairing Code for +${cleanPhone}...`);
       const pairingCode = await sock.requestPairingCode(cleanPhone);
       pairingCodeRequested = true;
+      latestPairingCode = pairingCode;
       
+      writeStatus({ status: 'pairing_ready', pairingCode, phone: cleanPhone });
+
       console.log('\n======================================================');
       console.log(`🔑 LIVE WHATSAPP PAIRING CODE:  ${pairingCode}`);
+      console.log('📱 Or open your Render URL: /qr to scan or view code live!');
+      console.log('⏰ Valid for 3-5 minutes. Enter this code on your phone.');
       console.log('======================================================\n');
     } catch (err: any) {
       if (retryCount < 5 && !sock.authState.creds.registered) {
-        console.log(`⏳ Socket initializing, retrying pairing code in 3s (attempt ${retryCount + 1}/5)...`);
-        setTimeout(() => requestPairing(retryCount + 1), 3000);
+        console.log(`⏳ Socket initializing, retrying pairing code in 5s (attempt ${retryCount + 1}/5)...`);
+        setTimeout(() => requestPairing(retryCount + 1), 5000);
       } else {
         console.error('Error requesting pairing code:', err?.message || err);
       }
     }
   };
 
-  if (!sock.authState.creds.registered) {
-    setTimeout(() => requestPairing(), 4000);
+  const usePairingCodeOnly = process.env.USE_PAIRING_CODE === 'true';
+  if (!sock.authState.creds.registered && TARGET_PHONE && usePairingCodeOnly) {
+    setTimeout(() => requestPairing(), 3000);
   }
 
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
+      console.log('\n📷 LIVE QR CODE GENERATED & SYNCED TO DASHBOARD! 🚀');
       try {
-        const qrPath = path.resolve(__dirname, '../public/whatsapp-qr.png');
-        await QRCode.toFile(qrPath, qr, { width: 400, margin: 2 });
+        qrcodeTerminal.generate(qr, { small: true });
       } catch (e) {}
+      
+      await writeStatus({ 
+        status: 'qr_ready', 
+        qr, 
+        pairingCode: latestPairingCode,
+        updatedAt: Date.now() 
+      });
     }
 
     if (connection === 'close') {
       const statusCode = (lastDisconnect?.error as any)?.output?.statusCode;
       const isLoggedOut = statusCode === DisconnectReason.loggedOut;
       console.log(`Connection closed (status ${statusCode}), loggedOut: ${isLoggedOut}`);
+      await writeStatus({ status: 'closed', statusCode, isLoggedOut });
       
       if (isLoggedOut || statusCode === 401) {
         console.log('🧹 Clearing stale session keys to generate fresh clean pairing code...');
@@ -137,9 +185,10 @@ async function startWhatsAppGateway() {
         } catch (e) {}
       }
 
-      console.log('🔄 Reconnecting in 3 seconds...');
-      setTimeout(() => startWhatsAppGateway(), 3000);
+      console.log('🔄 Reconnecting in 10 seconds...');
+      setTimeout(() => startWhatsAppGateway(), 10000);
     } else if (connection === 'open') {
+      await writeStatus({ status: 'open', message: 'WhatsApp Connected Live' });
       console.log('\n======================================================');
       console.log('✅ WHATSAPP CONNECTED & LIVE! Gateway is linked! 🚀');
       console.log('======================================================\n');
@@ -178,7 +227,8 @@ async function startWhatsAppGateway() {
       const rawPhone = remoteJid.replace('@s.whatsapp.net', '').replace('@lid', '');
       const pushName = msg.pushName || 'Buyer';
 
-      console.log(`\n📩 Inbound WhatsApp from ${pushName} (+${rawPhone}): "${messageText}"`);
+      // Mark message as read (blue tick)
+      sock.readMessages([msg.key]).catch(() => {});
 
       // 1. Send "Typing..." presence immediately for natural feel
       sock.sendPresenceUpdate('composing', remoteJid).catch(() => {});
@@ -240,21 +290,26 @@ async function startWhatsAppGateway() {
           targetJid = participantJid;
         }
 
-        // Send AI Reply over WhatsApp Socket
+        // Send AI Reply over WhatsApp Socket with automatic fallback
+        let sendSuccess = false;
         try {
           await sock.sendMessage(targetJid, { text: aiResponse });
+          sendSuccess = true;
         } catch (sendErr) {
-          console.warn(`Direct send to ${targetJid} failed, trying alternative target...`);
-          if (targetJid !== remoteJid) {
+          console.warn(`Direct send to ${targetJid} failed, trying alternative target ${remoteJid}...`);
+          try {
             await sock.sendMessage(remoteJid, { text: aiResponse });
-          } else {
-            throw sendErr;
+            sendSuccess = true;
+          } catch (fallbackErr) {
+            console.error(`❌ Error sending message to ${remoteJid}:`, (fallbackErr as any)?.message || fallbackErr);
           }
         }
         sock.sendPresenceUpdate('paused', remoteJid).catch(() => {});
         
         const duration = Date.now() - startTime;
-        console.log(`⚡ Sent AI reply to ${pushName} (${targetJid}) in ${duration}ms: "${aiResponse}"`);
+        if (sendSuccess) {
+          console.log(`⚡ Sent AI reply to ${pushName} (${targetJid}) in ${duration}ms: "${aiResponse}"`);
+        }
 
         // 6. Update in-memory message history
         const aiMsg: Message = { id: `m-${Date.now()}-2`, leadId: lead.id, role: 'ai', content: aiResponse, timestamp: Date.now() };

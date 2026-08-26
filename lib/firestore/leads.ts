@@ -91,14 +91,12 @@ export async function getLeadByPhone(phone: string): Promise<Lead | null> {
 
   if (isFirebaseConfigured() && adminDb) {
     try {
-      for (const p of possiblePhones) {
-        const snapshot = await adminDb.collection(LEADS_COLLECTION)
-          .where('phone', '==', p)
-          .limit(1)
-          .get();
-          
-        if (!snapshot.empty) return snapshot.docs[0].data() as Lead;
-      }
+      const snapshot = await adminDb.collection(LEADS_COLLECTION)
+        .where('phone', 'in', possiblePhones.slice(0, 10))
+        .limit(1)
+        .get();
+        
+      if (!snapshot.empty) return snapshot.docs[0].data() as Lead;
     } catch (error) {
       console.warn('[Firestore] Failed to get lead by phone from Firebase:', error);
     }
