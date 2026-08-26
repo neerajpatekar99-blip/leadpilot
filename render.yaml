@@ -13,24 +13,24 @@ services:
       - key: GROQ_API_KEY
         sync: false
       - key: FIREBASE_PROJECT_ID
-        value: ragnor-79342
+        sync: false
       - key: FIREBASE_CLIENT_EMAIL
-        value: firebase-adminsdk-fbsvc@ragnor-79342.iam.gserviceaccount.com
+        sync: false
       - key: FIREBASE_PRIVATE_KEY
         sync: false
       - key: NEXT_PUBLIC_FIREBASE_API_KEY
-        value: AIzaSyCXh62Gx4NC7YD_xeenwnQzNtkTWUCFv4s
+        sync: false
       - key: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-        value: ragnor-79342.firebaseapp.com
+        sync: false
       - key: NEXT_PUBLIC_FIREBASE_DATABASE_URL
-        value: https://ragnor-79342-default-rtdb.asia-southeast1.firebasedatabase.app
+        sync: false
       - key: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-        value: ragnor-79342
+        sync: false
       - key: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-        value: ragnor-79342.firebasestorage.app
+        sync: false
       - key: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-        value: "830309777870"
+        sync: false
       - key: NEXT_PUBLIC_FIREBASE_APP_ID
-        value: 1:830309777870:web:7c15158b7326fb98b82b9f
+        sync: false
       - key: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
-        value: G-KG7L2P7X7S
+        sync: false
