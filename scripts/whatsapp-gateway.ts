@@ -195,6 +195,30 @@ async function startWhatsAppGateway() {
     }
   });
 
+  // In-Memory address book cache to track all saved phone contacts
+  const phonebookContacts = new Set<string>();
+
+  sock.ev.on('contacts.upsert', (contacts) => {
+    for (const c of contacts) {
+      if (c.id) {
+        const clean = c.id.replace(/[^0-9]/g, '').slice(-10);
+        if (clean) phonebookContacts.add(clean);
+      }
+    }
+    if (phonebookContacts.size > 0) {
+      console.log(`📱 Synced ${phonebookContacts.size} saved phone contacts from address book (Excluded from AI auto-reply).`);
+    }
+  });
+
+  sock.ev.on('contacts.update', (contacts) => {
+    for (const c of contacts) {
+      if (c.id) {
+        const clean = c.id.replace(/[^0-9]/g, '').slice(-10);
+        if (clean) phonebookContacts.add(clean);
+      }
+    }
+  });
+
   // Handle incoming messages
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     for (const msg of messages) {
@@ -227,10 +251,20 @@ async function startWhatsAppGateway() {
       const rawPhone = remoteJid.replace('@s.whatsapp.net', '').replace('@lid', '');
       const pushName = msg.pushName || 'Buyer';
 
+      // 1. Check if number is in saved phone address book or explicitly excluded
+      const clean10 = rawPhone.replace(/[^0-9]/g, '').slice(-10);
+      const isSavedPhonebook = Boolean(clean10 && phonebookContacts.has(clean10));
+      const isExplicitlyExcluded = isNumberExcluded(rawPhone, cachedAgentProfile, null);
+
+      if (isSavedPhonebook || isExplicitlyExcluded) {
+        console.log(`🔇 SAVED CONTACT (+${rawPhone} / ${pushName}). Recorded in history but AI auto-reply skipped.`);
+        continue;
+      }
+
       // Mark message as read (blue tick)
       sock.readMessages([msg.key]).catch(() => {});
 
-      // 1. Send "Typing..." presence immediately for natural feel
+      // Send "Typing..." presence immediately for natural feel
       sock.sendPresenceUpdate('composing', remoteJid).catch(() => {});
 
       const startTime = Date.now();
@@ -259,15 +293,15 @@ async function startWhatsAppGateway() {
         const leadMsg: Message = { id: `m-${Date.now()}-1`, leadId: lead.id, role: 'lead', content: messageText, timestamp: Date.now() };
         saveMessage(lead.id, leadMsg).catch(() => {});
 
-        // 3. Check Master AI Killswitch and Saved/Excluded Numbers
+        // 3. Check Master AI Killswitch and Individual Lead Takeover
         if (cachedAgentProfile.aiEnabled === false) {
           console.log(`🛑 Master AI Killswitch is active (Manual Mode). Recorded message from ${pushName} but skipped auto-reply.`);
           sock.sendPresenceUpdate('paused', remoteJid).catch(() => {});
           continue;
         }
 
-        if (isNumberExcluded(rawPhone, cachedAgentProfile, lead)) {
-          console.log(`🔇 Saved/Excluded Number (+${rawPhone}). Recorded message from ${pushName} but skipped AI auto-reply.`);
+        if (lead.doNotReply === true || lead.aiStatus === 'agent_took_over') {
+          console.log(`👤 Manual Agent Takeover active for (+${rawPhone}). Skipped AI auto-reply.`);
           sock.sendPresenceUpdate('paused', remoteJid).catch(() => {});
           continue;
         }
