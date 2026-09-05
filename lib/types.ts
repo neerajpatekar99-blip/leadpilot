@@ -2,7 +2,7 @@ export interface Lead {
   id: string;
   name: string;
   phone: string;
-  email: string;
+  email?: string;
   source: 'facebook_ads' | 'manual' | 'csv_import' | '99acres' | 'magicbricks' | 'whatsapp_inbound';
   consentStatus: 'pending' | 'opted_in' | 'opted_out';
   status: 'new' | 'contacted' | 'site_visit' | 'negotiation' | 'closed';
