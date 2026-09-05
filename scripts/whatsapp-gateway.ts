@@ -40,25 +40,22 @@ async function writeStatus(statusData: any) {
   }
 }
 
-// Health check server only if running purely standalone and port is specified
-const isStandalone = process.env.STANDALONE_GATEWAY === 'true';
-if (isStandalone) {
-  const GATEWAY_PORT = process.env.GATEWAY_PORT || 3008;
-  const server = http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('LeadPilot WhatsApp Gateway is Live 24/7!\n');
+// Health check server for Railway/PaaS cloud platforms
+const GATEWAY_PORT = process.env.PORT || process.env.GATEWAY_PORT || 3008;
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('LeadPilot WhatsApp Gateway is Live 24/7!\n');
+});
+server.on('error', (err: any) => {
+  console.warn(`[HTTP Server Notice] Port ${GATEWAY_PORT} occupied (${err.code}), running socket in background.`);
+});
+try {
+  server.listen(Number(GATEWAY_PORT), '0.0.0.0', () => {
+    console.log(`🌐 Healthcheck HTTP server listening on port ${GATEWAY_PORT}`);
   });
-  server.on('error', (err: any) => {
-    console.warn(`[HTTP Server Notice] Port ${GATEWAY_PORT} occupied (${err.code}), running socket in background.`);
-  });
-  try {
-    server.listen(GATEWAY_PORT, () => {
-      console.log(`🌐 Healthcheck HTTP server listening on port ${GATEWAY_PORT}`);
-    });
-  } catch {}
-}
+} catch {}
 
-const TARGET_PHONE = process.env.WHATSAPP_LINK_PHONE || '';
+const TARGET_PHONE = process.env.WHATSAPP_LINK_PHONE || '919870178204';
 
 
 // In-Memory High Speed Caches (0ms retrieval)
