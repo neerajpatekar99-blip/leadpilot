@@ -47,7 +47,7 @@ export function DeviceLinkQRCard({ compact = false, onOpenModal }: DeviceLinkQRC
       const json = await res.json();
       setData(json);
 
-      const qrTarget = json.qr || json.directChatUrl || `https://wa.me/918879757407?text=${encodeURIComponent('Hi LeadPilot AI')}`;
+      const qrTarget = json.qr || json.directChatUrl || `https://wa.me/919870178204?text=${encodeURIComponent('Hi LeadPilot AI')}`;
       
       if (qrTarget && qrTarget !== lastQrRef.current) {
         lastQrRef.current = qrTarget;
@@ -92,6 +92,22 @@ export function DeviceLinkQRCard({ compact = false, onOpenModal }: DeviceLinkQRC
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'refresh' })
+      });
+      await fetchStatus(true);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleResetSession = async () => {
+    setRefreshing(true);
+    try {
+      await fetch('/api/whatsapp/qr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reset' })
       });
       await fetchStatus(true);
     } catch (e) {
@@ -295,7 +311,15 @@ export function DeviceLinkQRCard({ compact = false, onOpenModal }: DeviceLinkQRC
                   <span className="flex items-center gap-2 text-amber-400 font-bold">
                     <KeyIcon className="w-4 h-4" /> OPTION 2: 8-DIGIT PAIRING CODE
                   </span>
-                  <span className="text-[10px] text-gray-500 font-mono">Push to Phone</span>
+                  <button
+                    onClick={handleResetSession}
+                    disabled={refreshing}
+                    className="text-[11px] text-gray-400 hover:text-amber-400 flex items-center gap-1 bg-[#161b22] px-2.5 py-1 rounded-md border border-[#30363d] transition font-mono"
+                    title="Clear session and generate a brand new code"
+                  >
+                    <ArrowPathIcon className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-amber-400' : ''}`} />
+                    Reset & Fresh Code
+                  </button>
                 </div>
 
                 {data.pairingCode ? (
@@ -303,7 +327,7 @@ export function DeviceLinkQRCard({ compact = false, onOpenModal }: DeviceLinkQRC
                     <div className="space-y-1 text-center sm:text-left">
                       <div className="text-xs text-gray-400 font-mono">ENTER THIS ON YOUR PHONE:</div>
                       <div className="text-3xl sm:text-4xl font-mono font-black tracking-widest text-emerald-400 select-all">
-                        {data.pairingCode}
+                        {data.pairingCode.length === 8 ? `${data.pairingCode.slice(0, 4)}-${data.pairingCode.slice(4)}` : data.pairingCode}
                       </div>
                     </div>
                     <button
@@ -326,7 +350,7 @@ export function DeviceLinkQRCard({ compact = false, onOpenModal }: DeviceLinkQRC
                         </div>
                         <input
                           type="text"
-                          placeholder="e.g. +91 9876543210"
+                          placeholder="e.g. +91 98701 78204"
                           value={customPhone}
                           onChange={(e) => setCustomPhone(e.target.value)}
                           className="w-full bg-[#0d1117] border border-[#30363d] rounded-lg pl-8 pr-4 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 transition font-mono"
@@ -344,11 +368,12 @@ export function DeviceLinkQRCard({ compact = false, onOpenModal }: DeviceLinkQRC
                   </div>
                 )}
 
-                <div className="text-xs text-gray-400 bg-[#161b22]/70 p-4 rounded-xl space-y-1.5 border border-[#30363d] font-mono">
-                  <div className="font-semibold text-gray-200">📱 How to enter pairing code on WhatsApp:</div>
-                  <div>1. Open WhatsApp ➔ <b>Settings ⚙️</b> ➔ <b>Linked Devices</b></div>
-                  <div>2. Tap <b>Link a Device</b> ➔ Tap <b>&quot;Link with phone number instead&quot;</b> at the bottom</div>
-                  <div>3. Type the 8-digit code shown above on your phone</div>
+                <div className="text-xs text-gray-300 bg-[#161b22]/90 p-4 rounded-xl space-y-2 border border-[#30363d] font-mono">
+                  <div className="font-semibold text-emerald-400">📱 How to link on your phone:</div>
+                  <div>1. Open WhatsApp ➔ <b>Settings ⚙️</b> (or 3 dots on Android) ➔ <b>Linked Devices</b></div>
+                  <div>2. <span className="text-amber-300 font-semibold">Important</span>: If you already have 4 linked devices, tap each old device and tap <b>Log Out</b> first.</div>
+                  <div>3. Tap <b>Link a Device</b> ➔ Tap <b>&quot;Link with phone number instead&quot;</b> at the bottom</div>
+                  <div>4. Enter the 8-digit code shown above</div>
                 </div>
               </div>
             )}

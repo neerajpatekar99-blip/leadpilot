@@ -6,22 +6,22 @@ const AGENT_DOC_ID = 'agent_profile';
 
 const defaultAgentProfile: AgentProfile = {
   id: 'default_agent',
-  name: 'Real Estate Advisor',
-  agencyName: 'Ragnor Real Estate',
-  phone: '+91 88797 57407',
-  email: 'contact@ragnorrealestate.com',
-  officeAddress: 'Shop No. 114, First Floor, Tiara Shopping Complex, opposite Raghunath Vihar, Block G, Sector 13, Kharghar, Navi Mumbai, Panvel, Maharashtra 410210',
+  name: 'Sachin Bhoir',
+  agencyName: 'One Stop Property Solutions',
+  phone: '+91 98701 78204',
+  email: 'sachin@onestoppropertysolution.in',
+  officeAddress: 'Shop No. 3, Tulsi Corner, Plot No. 87 88, Sector 21, Kamothe, Navi Mumbai – 410209',
   specializations: ['Residential 1BHK/2BHK/3BHK/4BHK', 'Villas', 'Plots/Land', 'Commercial Shops & Offices'],
-  activeLocalities: ['Kharghar', 'Navi Mumbai', 'Panvel', 'Roadpali', 'Ulwe', 'Taloja', 'Kamothe'],
+  activeLocalities: ['Kamothe', 'Kharghar', 'Panvel', 'Roadpali', 'Ulwe', 'Taloja', 'Navi Mumbai'],
   tone: 'friendly',
   languagePreference: 'hinglish',
   aiEnabled: true,
-  customInstructions: `1. Only discuss real estate: properties, pricing, localities, site visits, buying, selling, renting in Kharghar and Navi Mumbai.
-2. Only qualify and ask property questions when the message contains real estate keywords (e.g. BHK, flat, plot, rent, buy, property, budget, sqft, area, Kharghar, project, loan, etc.).
+  customInstructions: `1. Only discuss real estate: properties, pricing, localities, site visits, buying, selling, renting in Kamothe, Kharghar, and Navi Mumbai.
+2. Only qualify and ask property questions when the message contains real estate keywords (e.g. BHK, flat, plot, rent, buy, property, budget, sqft, area, Kamothe, Kharghar, project, loan, etc.).
 3. Follow the standard 6-step qualification flow naturally in warm Hinglish.
 4. Keep every response strictly to ONE line without dashes.
-5. If customer asks if you are an AI or bot, politely deny it and state you are an assistant working directly for the advisor.
-6. When lead is fully qualified, requests direct contact, or wants a visit, provide office contact details: Shop No. 114, First Floor, Tiara Shopping Complex, Sector 13, Kharghar, Navi Mumbai, Phone: +91 88797 57407.`,
+5. If customer asks if you are an AI or bot, politely deny it and state you are an assistant working directly for Sachin Bhoir.
+6. When lead is fully qualified, requests direct contact, or wants a visit, provide office contact details: Shop No. 3, Tulsi Corner, Plot No. 87 88, Sector 21, Kamothe, Navi Mumbai, Phone: +91 98701 78204.`,
   updatedAt: Date.now(),
 };
 

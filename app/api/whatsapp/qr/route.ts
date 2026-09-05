@@ -10,7 +10,7 @@ export async function GET() {
   try {
     let sessionData: any = null;
     const profile = await getAgentProfile().catch(() => null);
-    const agentPhone = profile?.phone || '+91 88797 57407';
+    const agentPhone = profile?.phone || '+91 98701 78204';
     const cleanPhone = agentPhone.replace(/[^0-9]/g, '');
 
     // 1. Try Firestore (Instant Cloud Sync across Vercel & Workers)
@@ -62,9 +62,9 @@ export async function GET() {
     return NextResponse.json({ 
       error: error.message,
       status: 'ready',
-      qr: 'https://wa.me/918879757407?text=Hi%20LeadPilot',
+      qr: 'https://wa.me/919870178204?text=Hi%20LeadPilot',
       isDirectFallback: true,
-      agentPhone: '+91 88797 57407'
+      agentPhone: '+91 98701 78204'
     }, { status: 200 }); // Return 200 with fallback so UI never fails
   }
 }
@@ -80,7 +80,15 @@ export async function POST(req: Request) {
     };
 
     if (phone) {
-      payload.pairingPhone = phone.replace(/[^0-9]/g, '');
+      const digits = phone.replace(/[^0-9]/g, '');
+      payload.pairingPhone = digits.length === 10 ? `91${digits}` : digits;
+    }
+
+    if (action === 'reset') {
+      payload.status = 'reset_requested';
+      payload.pairingCode = null;
+      payload.formattedCode = null;
+      payload.qr = null;
     }
 
     // Update in Firestore
@@ -95,7 +103,12 @@ export async function POST(req: Request) {
     // Update in local file
     try {
       const authDir = path.resolve(process.cwd(), 'whatsapp_auth_info');
-      if (!fs.existsSync(authDir)) fs.mkdirSync(authDir, { recursive: true });
+      if (action === 'reset' && fs.existsSync(authDir)) {
+        fs.rmSync(authDir, { recursive: true, force: true });
+        fs.mkdirSync(authDir, { recursive: true });
+      } else {
+        if (!fs.existsSync(authDir)) fs.mkdirSync(authDir, { recursive: true });
+      }
       const statusFile = path.resolve(authDir, 'status.json');
       let currentData = {};
       if (fs.existsSync(statusFile)) {
@@ -106,7 +119,7 @@ export async function POST(req: Request) {
       fs.writeFileSync(statusFile, JSON.stringify({ ...currentData, ...payload }, null, 2));
     } catch (e) {}
 
-    return NextResponse.json({ success: true, message: 'WhatsApp session refresh requested' });
+    return NextResponse.json({ success: true, message: action === 'reset' ? 'WhatsApp session reset initiated' : 'WhatsApp session refresh requested' });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }

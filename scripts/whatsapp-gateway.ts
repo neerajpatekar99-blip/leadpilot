@@ -97,20 +97,37 @@ async function startWhatsAppGateway() {
     fs.mkdirSync(AUTH_DIR, { recursive: true });
   }
 
+  // If previous session is not fully registered or corrupted, clean stale files to ensure 100% fresh pairing
+  const credsFile = path.resolve(AUTH_DIR, 'creds.json');
+  if (fs.existsSync(credsFile)) {
+    try {
+      const existingCreds = JSON.parse(fs.readFileSync(credsFile, 'utf8'));
+      if (!existingCreds.registered) {
+        console.log('🧹 Purging stale unregistered auth state for clean 8-digit pairing code generation...');
+        fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+        fs.mkdirSync(AUTH_DIR, { recursive: true });
+      }
+    } catch (e) {
+      fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+      fs.mkdirSync(AUTH_DIR, { recursive: true });
+    }
+  }
+
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
   const { version, isLatest } = await fetchLatestBaileysVersion();
   console.log(`Using WhatsApp Web v${version.join('.')}, isLatest: ${isLatest}`);
 
+  // Browsers.ubuntu('Chrome') is strictly required for WhatsApp Pairing Code protocol
   const sock = makeWASocket({
     version,
     logger: pino({ level: 'silent' }),
-    printQRInTerminal: true,
+    printQRInTerminal: !TARGET_PHONE,
     auth: state,
-    browser: Browsers.macOS('Desktop'),
+    browser: Browsers.ubuntu('Chrome'),
     syncFullHistory: false,
-    connectTimeoutMs: 300000, // 5 minutes connection timeout
-    keepAliveIntervalMs: 10000, // 10 seconds keepalive heartbeat to prevent 408 timeouts
-    defaultQueryTimeoutMs: 300000,
+    connectTimeoutMs: 120000,
+    keepAliveIntervalMs: 15000,
+    defaultQueryTimeoutMs: 120000,
     generateHighQualityLinkPreview: false,
     getMessage: async (key) => {
       return undefined;
@@ -125,17 +142,35 @@ async function startWhatsAppGateway() {
   const requestPairing = async (retryCount = 0) => {
     if (pairingCodeRequested || sock.authState.creds.registered) return;
     try {
-      const cleanPhone = TARGET_PHONE.replace(/[^0-9]/g, '');
-      console.log(`\n⏳ Requesting live WhatsApp Pairing Code for +${cleanPhone}...`);
+      const rawTarget = TARGET_PHONE || cachedAgentProfile.phone || '919870178204';
+      let cleanPhone = rawTarget.replace(/[^0-9]/g, '');
+      if (cleanPhone.length === 10) {
+        cleanPhone = `91${cleanPhone}`;
+      } else if (cleanPhone.startsWith('0') && cleanPhone.length === 11) {
+        cleanPhone = `91${cleanPhone.slice(1)}`;
+      }
+      
+      console.log(`\n⏳ Requesting fresh WhatsApp Pairing Code for +${cleanPhone}...`);
       const pairingCode = await sock.requestPairingCode(cleanPhone);
       pairingCodeRequested = true;
       latestPairingCode = pairingCode;
       
-      writeStatus({ status: 'pairing_ready', pairingCode, phone: cleanPhone });
+      // Format as XXXX-XXXX for easier mobile input
+      const formattedCode = pairingCode.length === 8 
+        ? `${pairingCode.slice(0, 4)}-${pairingCode.slice(4)}`
+        : pairingCode;
+
+      await writeStatus({ 
+        status: 'pairing_ready', 
+        pairingCode, 
+        formattedCode,
+        phone: cleanPhone,
+        updatedAt: Date.now() 
+      });
 
       console.log('\n======================================================');
-      console.log(`🔑 LIVE WHATSAPP PAIRING CODE:  ${pairingCode}`);
-      console.log('📱 Or open your Render URL: /qr to scan or view code live!');
+      console.log(`🔑 LIVE WHATSAPP PAIRING CODE:  ${formattedCode} (${pairingCode})`);
+      console.log('📱 On phone: WhatsApp -> Linked Devices -> Link with phone number instead');
       console.log('⏰ Valid for 3-5 minutes. Enter this code on your phone.');
       console.log('======================================================\n');
     } catch (err: any) {
@@ -148,8 +183,8 @@ async function startWhatsAppGateway() {
     }
   };
 
-  const usePairingCodeOnly = process.env.USE_PAIRING_CODE === 'true';
-  if (!sock.authState.creds.registered && TARGET_PHONE && usePairingCodeOnly) {
+  const usePairingCodeOnly = process.env.USE_PAIRING_CODE !== 'false';
+  if (!sock.authState.creds.registered && (TARGET_PHONE || usePairingCodeOnly)) {
     setTimeout(() => requestPairing(), 3000);
   }
 

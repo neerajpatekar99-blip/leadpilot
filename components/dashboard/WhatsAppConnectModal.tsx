@@ -46,7 +46,7 @@ export function WhatsAppConnectModal({ isOpen, onClose }: Props) {
       const json = await res.json();
       setData(json);
 
-      const qrTarget = json.qr || json.directChatUrl || `https://wa.me/918879757407?text=${encodeURIComponent('Hi LeadPilot AI')}`;
+      const qrTarget = json.qr || json.directChatUrl || `https://wa.me/919870178204?text=${encodeURIComponent('Hi LeadPilot AI')}`;
       
       if (qrTarget && qrTarget !== lastQrRef.current) {
         lastQrRef.current = qrTarget;
@@ -92,6 +92,22 @@ export function WhatsAppConnectModal({ isOpen, onClose }: Props) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'refresh' })
+      });
+      await fetchStatus(true);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleResetSession = async () => {
+    setRefreshing(true);
+    try {
+      await fetch('/api/whatsapp/qr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reset' })
       });
       await fetchStatus(true);
     } catch (e) {
@@ -246,16 +262,27 @@ export function WhatsAppConnectModal({ isOpen, onClose }: Props) {
               {activeTab === 'pairing' && (
                 /* Option 2: 8-Digit Pairing Code */
                 <div className="bg-[#0d1117] border border-[#30363d] rounded-xl p-5 space-y-4">
-                  <div className="text-xs text-amber-400 font-mono uppercase tracking-wider flex items-center gap-1.5 font-bold">
-                    <KeyIcon className="w-4 h-4" /> OPTION 2: 8-DIGIT PAIRING CODE
+                  <div className="flex items-center justify-between text-xs text-amber-400 font-mono uppercase tracking-wider font-bold">
+                    <span className="flex items-center gap-1.5">
+                      <KeyIcon className="w-4 h-4" /> OPTION 2: 8-DIGIT PAIRING CODE
+                    </span>
+                    <button
+                      onClick={handleResetSession}
+                      disabled={refreshing}
+                      className="text-[11px] text-gray-400 hover:text-amber-400 flex items-center gap-1 bg-[#161b22] px-2 py-0.5 rounded border border-[#30363d] transition"
+                      title="Clear session and generate fresh code"
+                    >
+                      <ArrowPathIcon className={`w-3 h-3 ${refreshing ? 'animate-spin text-amber-400' : ''}`} />
+                      Reset Code
+                    </button>
                   </div>
 
                   {data.pairingCode ? (
                     <div className="bg-[#161b22] border border-[#30363d] rounded-xl p-4 flex items-center justify-between">
                       <div className="space-y-0.5">
-                        <div className="text-[10px] text-gray-400 font-mono">LIVE PAIRING CODE:</div>
-                        <div className="text-3xl font-mono font-bold tracking-widest text-emerald-400 select-all">
-                          {data.pairingCode}
+                        <div className="text-[10px] text-gray-400 font-mono">ENTER THIS ON YOUR PHONE:</div>
+                        <div className="text-2xl sm:text-3xl font-mono font-bold tracking-widest text-emerald-400 select-all">
+                          {data.pairingCode.length === 8 ? `${data.pairingCode.slice(0, 4)}-${data.pairingCode.slice(4)}` : data.pairingCode}
                         </div>
                       </div>
                       <button
@@ -273,7 +300,7 @@ export function WhatsAppConnectModal({ isOpen, onClose }: Props) {
                       <div className="flex gap-2">
                         <input
                           type="text"
-                          placeholder="e.g. +91 9876543210"
+                          placeholder="e.g. +91 98701 78204"
                           value={customPhone}
                           onChange={(e) => setCustomPhone(e.target.value)}
                           className="flex-1 bg-[#161b22] border border-[#30363d] rounded-lg px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 font-mono"
@@ -289,9 +316,12 @@ export function WhatsAppConnectModal({ isOpen, onClose }: Props) {
                     </form>
                   )}
 
-                  <div className="text-[11px] text-gray-400 bg-[#161b22]/70 p-3 rounded-lg space-y-1 font-mono">
-                    <div>1. WhatsApp ➔ Settings ⚙️ ➔ Linked Devices</div>
-                    <div>2. Link a Device ➔ Link with phone number instead</div>
+                  <div className="text-[11px] text-gray-300 bg-[#161b22]/90 p-3.5 rounded-lg space-y-1.5 font-mono border border-[#30363d]">
+                    <div className="font-semibold text-emerald-400">📱 How to Link:</div>
+                    <div>1. WhatsApp ➔ Settings ⚙️ (or 3 dots) ➔ <b>Linked Devices</b></div>
+                    <div>2. <b>Important</b>: Check if you have 4 linked devices. If so, log out of old ones first.</div>
+                    <div>3. Tap <b>Link a Device</b> ➔ Tap <b>&quot;Link with phone number instead&quot;</b> at the bottom</div>
+                    <div>4. Enter the 8-digit code above</div>
                   </div>
                 </div>
               )}
